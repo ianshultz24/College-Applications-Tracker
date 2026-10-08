@@ -35,7 +35,8 @@ type GridProps = {
   addOpen: boolean;
   onOpen: (id: string) => void;
   onAdd: () => void;
-  onHover: (id: string | null) => void;
+  /** Hover/focus anywhere on a tile's column (tile + dots) targets it for keys 1–6. */
+  onHover: (id: string, on: boolean) => void;
   onStatus: (id: string, status: Status) => void;
   onRemove: (id: string) => void;
   onMove: (id: string, position: number) => void;
@@ -119,6 +120,10 @@ function SortableTile({ school, dragging, ...p }: GridProps & { school: School; 
     <li
       ref={setNodeRef}
       data-tile={school.id}
+      onPointerEnter={() => p.onHover(school.id, true)}
+      onPointerLeave={() => p.onHover(school.id, false)}
+      onFocus={() => p.onHover(school.id, true)}
+      onBlur={() => p.onHover(school.id, false)}
       style={{
         position: "relative",
         display: "flex",
@@ -143,7 +148,6 @@ function SortableTile({ school, dragging, ...p }: GridProps & { school: School; 
         isOpen={p.openId === school.id}
         isDragging={dragging || isDragging}
         onOpen={() => p.onOpen(school.id)}
-        onHover={p.onHover}
         onStatus={(status) => p.onStatus(school.id, status)}
         onRemove={() => p.onRemove(school.id)}
         handle={

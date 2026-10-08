@@ -133,8 +133,9 @@ function TrackerView() {
               addOpen={!!open && open.mode === "add"}
               onOpen={openTile}
               onAdd={openAdd}
-              onHover={(id) => {
-                hoverId.current = id;
+              onHover={(id, on) => {
+                if (on) hoverId.current = id;
+                else if (hoverId.current === id) hoverId.current = null;
               }}
               onStatus={store.setStatus}
               onRemove={(id) => store.removeSchool(id, "Removed")}

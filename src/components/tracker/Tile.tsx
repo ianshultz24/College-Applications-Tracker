@@ -32,7 +32,6 @@ type Props = {
   isOpen: boolean;
   isDragging?: boolean;
   onOpen: () => void;
-  onHover: (id: string | null) => void;
   onStatus?: (status: Status) => void;
   onRemove?: () => void;
   /** Drag handle element (from the sortable grid), shown in edit-all mode. */
@@ -51,7 +50,6 @@ export function Tile({
   isOpen,
   isDragging,
   onOpen,
-  onHover,
   onStatus,
   onRemove,
   handle,
@@ -69,13 +67,11 @@ export function Tile({
 
   const enter = (el: HTMLElement) => {
     setHover(true);
-    onHover(school.id);
     el.style.setProperty("--ty", "-3px");
     if (tiltOn) el.style.setProperty("--sh", "1");
   };
   const leave = (el: HTMLElement) => {
     setHover(false);
-    onHover(null);
     for (const p of ["--mx", "--my", "--rx", "--ry", "--tx", "--ty", "--sh"]) el.style.removeProperty(p);
   };
   const tilt = (e: ReactPointerEvent<HTMLButtonElement>) => {
