@@ -85,7 +85,7 @@ function TrackerView() {
     const onKey = (e: KeyboardEvent) => {
       if (open) return;
       if (e.key === "Escape") {
-        if (settingsOpen) setSettingsOpen(false);
+        if (settingsOpen) closeSettings();
         else if (editAll) setEditAll(false);
         return;
       }

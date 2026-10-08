@@ -15,6 +15,19 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Permissions-Policy", value: "microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
   async redirects() {
     // This app owns ianshultz.com but only lives under /collegetracker.
     // Everything else goes to the photography site (temporary, so it can change later).

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { logoPath } from "@/lib/backend";
 import { tileLook } from "@/lib/colors";
 import { blankDraft, fromDraft, isDirty, toDraft, validateDraft, type Draft, type DraftLogo } from "@/lib/draft";
+import { newId } from "@/lib/id";
 import { compressLogo, imageFromDataTransfer, isImageFile } from "@/lib/images";
 import type { Layout } from "@/lib/layout";
 import { positionAtEnd } from "@/lib/position";
@@ -248,7 +249,7 @@ function FormPanel({
 }) {
   const store = useStore();
   const mode = open.mode === "add" || !school ? "add" : "edit";
-  const [original] = useState<Draft>(() => (school && mode === "edit" ? toDraft(school) : blankDraft(crypto.randomUUID())));
+  const [original] = useState<Draft>(() => (school && mode === "edit" ? toDraft(school) : blankDraft(newId())));
   const [draft, setDraft] = useState<Draft>(original);
   const [errors, setErrors] = useState<FormErrors>({});
   const [logoBusy, setLogoBusy] = useState(false);
