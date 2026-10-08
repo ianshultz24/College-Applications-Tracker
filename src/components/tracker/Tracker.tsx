@@ -9,6 +9,7 @@ import { Background } from "./Background";
 import { Card, type OpenState } from "./Card";
 import { EmptyState, Grid } from "./Grid";
 import { Header } from "./Header";
+import { SettingsPanel } from "./SettingsPanel";
 import { TrackerProvider, useStore } from "./store";
 import { useViewportWidth } from "./useViewportWidth";
 
@@ -68,6 +69,11 @@ function TrackerView() {
     if (!open) setOpen({ id: null, mode: "add", from: "add", layoutKey: "tile-__add" });
   }, [open]);
 
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    document.querySelector<HTMLElement>('[aria-controls="ct-settings"]')?.focus({ preventScroll: true });
+  }, []);
+
   const toggleEdit = useCallback(() => {
     if (open) return;
     setEditAll((v) => !v);
@@ -95,7 +101,7 @@ function TrackerView() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, settingsOpen, editAll, store]);
+  }, [open, settingsOpen, editAll, store, closeSettings]);
 
   const ready = width > 0;
 
@@ -109,7 +115,7 @@ function TrackerView() {
           settingsOpen={settingsOpen}
           canEdit={schools.length > 0}
           onToggleEdit={toggleEdit}
-          onToggleSettings={() => setSettingsOpen((v) => !v)}
+          onToggleSettings={() => (settingsOpen ? closeSettings() : setSettingsOpen(true))}
         />
         <main
           className="flex items-center justify-center"
@@ -146,6 +152,7 @@ function TrackerView() {
           )}
         </main>
       </div>
+      <SettingsPanel open={settingsOpen} narrow={L.narrow} onClose={closeSettings} />
       <Card open={open} setOpen={setOpen} L={L} reduced={reduced} />
     </LayoutGroup>
   );

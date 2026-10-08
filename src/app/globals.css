@@ -83,3 +83,19 @@ input[type="date"]::-webkit-date-and-time-value {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* react-colorful inside the settings panel */
+.ct-picker .react-colorful {
+  width: 100%;
+  height: 168px;
+}
+.ct-picker .react-colorful__saturation {
+  border-radius: 12px 12px 0 0;
+}
+.ct-picker .react-colorful__last-control {
+  border-radius: 0 0 12px 12px;
+}
+.ct-picker .react-colorful__pointer {
+  width: 22px;
+  height: 22px;
+}

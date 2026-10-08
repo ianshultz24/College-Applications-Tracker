@@ -25,6 +25,7 @@ type Store = {
   resetSettings: () => void;
   setBackground: (file: File) => Promise<void>;
   clearBackground: () => void;
+  exportAll: Backend["exportAll"];
 };
 
 const StoreContext = createContext<Store | null>(null);
@@ -190,27 +191,52 @@ export function TrackerProvider({
   const latest = useRef(initialSettings);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const persistSettings = useCallback(() => {
+  const saveNow = useCallback(async () => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      const next = latest.current;
-      const before = saved.current;
-      try {
-        await backend.saveSettings(next);
-        saved.current = next;
-        if (before.background_path && before.background_path !== next.background_path) {
-          backend.deleteImages([before.background_path]).catch(() => {});
-        }
-      } catch {
-        latest.current = saved.current;
-        setSettings(saved.current);
-        setBgPreview(null);
-        errorToast(errMsg("your settings"));
+    timer.current = undefined;
+    const next = latest.current;
+    const before = saved.current;
+    if (next === before) return;
+    try {
+      await backend.saveSettings(next);
+      saved.current = next;
+      if (before.background_path && before.background_path !== next.background_path) {
+        backend.deleteImages([before.background_path]).catch(() => {});
       }
-    }, 450);
+    } catch {
+      latest.current = saved.current;
+      setSettings(saved.current);
+      setBgPreview(null);
+      errorToast(errMsg("your settings"));
+    }
   }, [backend]);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const persistSettings = useCallback(() => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(saveNow, 450);
+  }, [saveNow]);
+
+  // Don't lose a change made in the last half-second before the tab is hidden or closed.
+  useEffect(() => {
+    const flush = () => {
+      if (timer.current !== undefined) void saveNow();
+    };
+    const onVisibility = () => document.visibilityState === "hidden" && flush();
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearTimeout(timer.current);
+    };
+  }, [saveNow]);
+
+  /** Everything saved (pending settings first, then each school's write queue), then a fresh read. */
+  const exportAll = useCallback(async () => {
+    await saveNow();
+    await Promise.allSettled([...queues.current.values()]);
+    return backend.exportAll();
+  }, [saveNow, backend]);
 
   const updateSettings = useCallback<Store["updateSettings"]>(
     (patch) => {
@@ -232,14 +258,15 @@ export function TrackerProvider({
 
   const setBackground = useCallback<Store["setBackground"]>(
     async (file) => {
-      const preview = URL.createObjectURL(file);
-      setBgPreview(preview);
       try {
+        // Compress first, then show the small version (decoding a full-size photo is heavy on phones).
         const small = await compressBackground(file);
+        setBgPreview(URL.createObjectURL(small));
         const path = backgroundPath(backend.userId);
         await backend.uploadImage(path, small);
         updateSettings({ background_path: path });
-      } catch {
+      } catch (err) {
+        if (process.env.NODE_ENV === "development") console.warn("[ct] background upload failed", err);
         setBgPreview(null);
         errorToast("Couldn't upload that photo — try a different image.");
       }
@@ -275,8 +302,9 @@ export function TrackerProvider({
       resetSettings,
       setBackground,
       clearBackground,
+      exportAll,
     }),
-    [backend, schools, settings, logoUrl, backgroundUrl, createSchool, updateSchool, setStatus, removeSchool, moveSchool, updateSettings, resetSettings, setBackground, clearBackground],
+    [backend, schools, settings, logoUrl, backgroundUrl, createSchool, updateSchool, setStatus, removeSchool, moveSchool, updateSettings, resetSettings, setBackground, clearBackground, exportAll],
   );
 
   return <StoreContext value={value}>{children}</StoreContext>;

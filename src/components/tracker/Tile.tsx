@@ -182,7 +182,7 @@ export function Tile({
                   position: "absolute",
                   inset: 0,
                   pointerEvents: "none",
-                  background: look.sheen,
+                  backgroundImage: look.sheen,
                   backgroundSize: "300% 300%",
                   backgroundPosition: "calc(100% - var(--mx, 50%)) calc(100% - var(--my, 50%))",
                 }}
