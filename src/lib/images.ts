@@ -7,7 +7,7 @@ export function compressLogo(file: File): Promise<File> {
     fileType: "image/webp",
     initialQuality: 0.9,
     maxSizeMB: 0.5,
-    useWebWorker: true,
+    useWebWorker: false, // the worker mode loads a script from a CDN; keep everything local
   });
 }
 
@@ -18,7 +18,7 @@ export function compressBackground(file: File): Promise<File> {
     fileType: "image/webp",
     initialQuality: 0.8,
     maxSizeMB: 4,
-    useWebWorker: true,
+    useWebWorker: false, // the worker mode loads a script from a CDN; keep everything local
   });
 }
 

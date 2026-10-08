@@ -87,7 +87,8 @@ export function Grid(props: GridProps) {
             margin: 0,
             padding: 0,
             display: "grid",
-            gridTemplateColumns: `repeat(${L.cols}, ${L.tile}px)`,
+            // Never more columns than tiles, so short lists stay centered.
+            gridTemplateColumns: `repeat(${Math.max(1, Math.min(L.cols, schools.length + (editAll ? 1 : 0)))}, ${L.tile}px)`,
             justifyContent: "center",
             alignItems: "start",
             columnGap: L.gap,

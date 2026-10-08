@@ -6,12 +6,11 @@ import type { Backend } from "@/lib/backend";
 import { computeLayout } from "@/lib/layout";
 import { STATUSES, type School, type Settings } from "@/lib/types";
 import { Background } from "./Background";
+import { Card, type OpenState } from "./Card";
 import { EmptyState, Grid } from "./Grid";
 import { Header } from "./Header";
 import { TrackerProvider, useStore } from "./store";
 import { useViewportWidth } from "./useViewportWidth";
-
-export type OpenState = { id: string | null; mode: "view" | "edit" | "add"; from: "tile" | "view" | "add" } | null;
 
 export function Tracker(props: { backend: Backend; initialSchools: School[]; initialSettings: Settings }) {
   return (
@@ -31,8 +30,27 @@ function TrackerView() {
 
   const [editAll, setEditAll] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [open, setOpen] = useState<OpenState>(null);
+  const [open, setOpen] = useState<OpenState | null>(null);
   const hoverId = useRef<string | null>(null);
+
+  // When the card closes, put keyboard focus back on the tile it came from.
+  const lastTarget = useRef<string | null>(null);
+  useEffect(() => {
+    if (open) {
+      lastTarget.current = open.id ?? "__add";
+      return;
+    }
+    const target = lastTarget.current;
+    if (!target) return;
+    lastTarget.current = null;
+    const t = setTimeout(() => {
+      const el =
+        document.querySelector<HTMLElement>(`[data-tile="${target}"] [data-tile-btn]`) ??
+        document.querySelector<HTMLElement>(`[data-tile="${target}"] button`);
+      el?.focus({ preventScroll: true });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [open]);
 
   const L = useMemo(
     () => computeLayout(width || 1280, settings.tile_size, { editAll, showNames: settings.show_names }),
@@ -42,12 +60,12 @@ function TrackerView() {
   const openTile = useCallback(
     (id: string) => {
       if (open) return;
-      setOpen(editAll ? { id, mode: "edit", from: "tile" } : { id, mode: "view", from: "tile" });
+      setOpen({ id, mode: editAll ? "edit" : "view", from: "tile", layoutKey: `tile-${id}` });
     },
     [open, editAll],
   );
   const openAdd = useCallback(() => {
-    if (!open) setOpen({ id: null, mode: "add", from: "add" });
+    if (!open) setOpen({ id: null, mode: "add", from: "add", layoutKey: "tile-__add" });
   }, [open]);
 
   const toggleEdit = useCallback(() => {
@@ -127,6 +145,7 @@ function TrackerView() {
           )}
         </main>
       </div>
+      <Card open={open} setOpen={setOpen} L={L} reduced={reduced} />
     </LayoutGroup>
   );
 }
