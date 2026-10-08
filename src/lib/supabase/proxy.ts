@@ -35,6 +35,9 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const onSignIn = path === SIGN_IN_PATH;
 
+  // Local dev only: the in-memory preview (/dev/preview) works without signing in.
+  if (process.env.NODE_ENV === "development" && path.startsWith("/dev/")) return response;
+
   if (!signedIn && !onSignIn) {
     return redirectKeepingCookies(request, response, SIGN_IN_PATH);
   }

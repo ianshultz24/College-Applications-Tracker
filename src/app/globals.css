@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist), system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+  --color-ink: #17181c;
+  --color-muted: #6b6e76;
+  --color-subtle: #53565e;
+  --color-line: #e3e4e9;
+  --color-danger: #b9443a;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Animatable tilt/shimmer variables used by the tiles (from the design). */
+@property --mx { syntax: "<percentage>"; inherits: true; initial-value: 50%; }
+@property --my { syntax: "<percentage>"; inherits: true; initial-value: 50%; }
+@property --sh { syntax: "<number>"; inherits: true; initial-value: 0.3; }
+
+html,
+body {
+  margin: 0;
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #2a2623;
+  color: #17181c;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+a {
+  color: #17181c;
+}
+a:hover {
+  color: #3566b8;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #a3a6ae;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Native date inputs: keep the design's type and hide the calendar icon on narrow cards. */
+input[type="date"] {
+  min-height: 54px;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+/* Visible keyboard focus everywhere (mouse clicks stay clean). */
+:focus-visible {
+  outline: 2px solid #3566b8;
+  outline-offset: 2px;
+}
+.ct-dark :focus-visible {
+  outline-color: #ffffff;
+}
+.ct-field:focus-visible,
+.ct-field:focus {
+  outline: none;
+  border-color: #17181c !important;
+  box-shadow: 0 0 0 3px rgba(23, 24, 28, 0.08);
+}
+
+.ct-noscrollbar {
+  scrollbar-width: none;
+}
+.ct-noscrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -7,16 +7,23 @@ describe("monogram", () => {
   it("uses initials of meaningful words", () => {
     expect(monogram("Massachusetts Institute of Technology")).toBe("MIT");
     expect(monogram("University of California, Berkeley")).toBe("UCB");
-    expect(monogram("Stanford University")).toBe("SU");
+    expect(monogram("Boston College")).toBe("BC");
+    expect(monogram("Notre Dame")).toBe("ND");
   });
-  it("uses two letters for one word", () => {
-    expect(monogram("Caltech")).toBe("CA");
+  it("keeps acronyms and inner capitals", () => {
+    expect(monogram("USC")).toBe("USC");
+    expect(monogram("UVA")).toBe("UVA");
+    expect(monogram("WashU")).toBe("WU");
+  });
+  it("uses one letter for a plain single word", () => {
+    expect(monogram("Bentley")).toBe("B");
+    expect(monogram("Caltech")).toBe("C");
   });
   it("prefers a short name", () => {
     expect(monogram("University of California, Los Angeles", "ucla")).toBe("UCLA");
   });
   it("handles blanks", () => {
-    expect(monogram("   ")).toBe("?");
+    expect(monogram("   ")).toBe("");
   });
 });
 
