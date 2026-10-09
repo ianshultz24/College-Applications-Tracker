@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Settings as Gear } from "lucide-react";
+import { Gamepad2, Pencil, Settings as Gear } from "lucide-react";
 
 const iconBtn =
   "flex size-[38px] items-center justify-center rounded-xl border border-white/14 text-white transition-colors hover:bg-white/18";
@@ -9,15 +9,19 @@ export function Header({
   narrow,
   editAll,
   settingsOpen,
+  gamesOpen,
   onToggleEdit,
   onToggleSettings,
+  onToggleGames,
   canEdit,
 }: {
   narrow: boolean;
   editAll: boolean;
   settingsOpen: boolean;
+  gamesOpen: boolean;
   onToggleEdit: () => void;
   onToggleSettings: () => void;
+  onToggleGames: () => void;
   canEdit: boolean;
 }) {
   return (
@@ -29,6 +33,20 @@ export function Header({
         College Tracker
       </h1>
       <div className="flex items-center gap-2">
+        {!editAll && (
+          <button
+            type="button"
+            onClick={onToggleGames}
+            aria-label="Game Mode"
+            aria-expanded={gamesOpen}
+            aria-controls="ct-games"
+            title="Game Mode"
+            className={iconBtn}
+            style={{ background: gamesOpen ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.08)" }}
+          >
+            <Gamepad2 size={19} strokeWidth={1.9} aria-hidden />
+          </button>
+        )}
         {editAll ? (
           <button
             type="button"

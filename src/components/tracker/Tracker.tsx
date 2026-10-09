@@ -1,6 +1,7 @@
 "use client";
 
 import { MotionConfig, useReducedMotion } from "motion/react";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Backend } from "@/lib/backend";
 import { computeLayout } from "@/lib/layout";
@@ -12,6 +13,9 @@ import { Header } from "./Header";
 import { SettingsPanel } from "./SettingsPanel";
 import { TrackerProvider, useStore } from "./store";
 import { useViewportWidth } from "./useViewportWidth";
+
+// Game Mode downloads only the first time its button is pressed; each game downloads only on Play.
+const GameMode = dynamic(() => import("../games/GameMode"), { ssr: false });
 
 export function Tracker(props: { backend: Backend; initialSchools: School[]; initialSettings: Settings }) {
   return (
@@ -31,6 +35,11 @@ function TrackerView() {
 
   const [editAll, setEditAll] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [gamesOpen, setGamesOpen] = useState(false);
+  /** Stays true once Game Mode has been opened, so its code is fetched once and the drawer can slide out. */
+  const [gamesLoaded, setGamesLoaded] = useState(false);
+  /** A full-screen game is playing: the tracker is frozen (no clicks, hover, keys or scroll) and blurred. */
+  const [frozen, setFrozen] = useState(false);
   const [open, setOpen] = useState<OpenState | null>(null);
   /** The tile a closing card is shrinking back into; it stays hidden until the card lands on it. */
   const [landing, setLanding] = useState<string | null>(null);
@@ -80,18 +89,41 @@ function TrackerView() {
     document.querySelector<HTMLElement>('[aria-controls="ct-settings"]')?.focus({ preventScroll: true });
   }, []);
 
+  const closeGames = useCallback((refocus = true) => {
+    setGamesOpen(false);
+    if (refocus) document.querySelector<HTMLElement>('[aria-controls="ct-games"]')?.focus({ preventScroll: true });
+  }, []);
+
+  const toggleGames = useCallback(() => {
+    if (open) return;
+    if (gamesOpen) return closeGames();
+    setSettingsOpen(false);
+    setGamesLoaded(true);
+    setGamesOpen(true);
+  }, [open, gamesOpen, closeGames]);
+
+  // When a game ends, give keyboard focus back to the Game Mode button.
+  const wasFrozen = useRef(false);
+  useEffect(() => {
+    if (wasFrozen.current && !frozen) {
+      document.querySelector<HTMLElement>('[aria-controls="ct-games"]')?.focus({ preventScroll: true });
+    }
+    wasFrozen.current = frozen;
+  }, [frozen]);
+
   const toggleEdit = useCallback(() => {
     if (open) return;
     setEditAll((v) => !v);
   }, [open]);
 
-  // Esc: settings first, then edit-all. (The card handles its own Esc.)
+  // Esc: game drawer or settings first, then edit-all. (The card and a running game handle their own Esc.)
   // Edit-all: hover or focus a tile and press 1–6 to set its status.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (open) return;
+      if (open || frozen) return;
       if (e.key === "Escape") {
-        if (settingsOpen) closeSettings();
+        if (gamesOpen) closeGames();
+        else if (settingsOpen) closeSettings();
         else if (editAll) setEditAll(false);
         return;
       }
@@ -107,21 +139,27 @@ function TrackerView() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, settingsOpen, editAll, store, closeSettings]);
+  }, [open, frozen, gamesOpen, settingsOpen, editAll, store, closeSettings, closeGames]);
 
   const ready = width > 0;
 
   return (
     <>
       <Background url={store.backgroundUrl} blur={settings.blur_px} dim={settings.dim} />
-      <div className="relative z-[1] flow-root min-h-dvh">
+      <div className="relative z-[1] flow-root min-h-dvh" inert={frozen} aria-hidden={frozen || undefined}>
         <Header
           narrow={L.narrow}
           editAll={editAll}
           settingsOpen={settingsOpen}
+          gamesOpen={gamesOpen}
           canEdit={schools.length > 0}
           onToggleEdit={toggleEdit}
-          onToggleSettings={() => (settingsOpen ? closeSettings() : setSettingsOpen(true))}
+          onToggleSettings={() => {
+            if (settingsOpen) return closeSettings();
+            closeGames(false);
+            setSettingsOpen(true);
+          }}
+          onToggleGames={toggleGames}
         />
         <main
           className="flex items-center justify-center"
@@ -158,6 +196,9 @@ function TrackerView() {
         </main>
       </div>
       <SettingsPanel open={settingsOpen} narrow={L.narrow} onClose={closeSettings} />
+      {gamesLoaded && (
+        <GameMode drawerOpen={gamesOpen} narrow={L.narrow} reduced={reduced} onCloseDrawer={closeGames} onFrozenChange={setFrozen} />
+      )}
       <Card open={open} setOpen={setOpen} landing={landing} setLanding={setLanding} L={L} reduced={reduced} />
     </>
   );

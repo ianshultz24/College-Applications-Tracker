@@ -110,3 +110,52 @@ input[type="date"]::-webkit-date-and-time-value {
   width: 22px;
   height: 22px;
 }
+
+/* Game Mode card art: still until the card is hovered or focused. */
+.ct-art-anim {
+  animation-play-state: paused !important;
+}
+.group:hover .ct-art-anim,
+.group:focus-within .ct-art-anim {
+  animation-play-state: running !important;
+}
+@keyframes ct-art-feed {
+  from { transform: translateY(0); }
+  to { transform: translateY(52px); }
+}
+@keyframes ct-art-fall {
+  0% { transform: translate(0, -24px) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate(var(--dx), 50px) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes ct-art-led {
+  0%, 100% { fill: #5fd38a; }
+  50% { fill: #ffb347; }
+}
+
+/* Worry Shredder: the machine's light, cutters and shake while it runs. */
+@keyframes ct-led-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes ct-cutters {
+  from { background-position: 0 0; }
+  to { background-position: 0 -12px; }
+}
+@keyframes ct-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(0.6px, -0.4px); }
+  50% { transform: translate(-0.5px, 0.5px); }
+  75% { transform: translate(0.4px, 0.3px); }
+}
+@keyframes ct-nudge {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(var(--nx, 6px), var(--ny, 0px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ct-art-anim,
+  .ct-motion {
+    animation: none !important;
+  }
+}

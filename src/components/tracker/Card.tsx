@@ -28,6 +28,7 @@ import { SchoolForm, type FormErrors } from "./SchoolForm";
 import { SchoolView } from "./SchoolView";
 import { useStore, type PendingLogo } from "./store";
 import { TileSkin } from "./Tile";
+import { useScrollLock } from "./useScrollLock";
 
 export type OpenState = {
   id: string | null;
@@ -98,19 +99,8 @@ export function Card({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, requestClose]);
 
-  // Lock page scroll behind the card. If a scrollbar is showing, keep its space so nothing shifts.
-  const isOpen = !!open;
-  useEffect(() => {
-    if (!isOpen) return;
-    const html = document.documentElement;
-    const prev = { overflow: html.style.overflow, gutter: html.style.scrollbarGutter };
-    if (window.innerWidth > html.clientWidth) html.style.scrollbarGutter = "stable";
-    html.style.overflow = "hidden";
-    return () => {
-      html.style.overflow = prev.overflow;
-      html.style.scrollbarGutter = prev.gutter;
-    };
-  }, [isOpen]);
+  // Lock page scroll behind the card.
+  useScrollLock(!!open);
 
   // View mode: focus the dialog so Tab starts inside it.
   useEffect(() => {
