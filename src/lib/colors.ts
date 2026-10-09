@@ -93,8 +93,8 @@ export type TileLook = {
   labelBg: string;
   labelRing: string;
   opacity: number;
-  /** Flat color used to morph the card's background while it grows. */
-  flat: string;
+  /** The tile's side, seen when it lifts or tilts (a darker shade of its lower edge). */
+  edge: string;
 };
 
 const highlight = (a: number) =>
@@ -122,7 +122,7 @@ export function tileLook(status: Status, colors: Colors): TileLook {
       labelBg: "rgba(255,255,255,0.12)",
       labelRing: "inset 0 0 0 1px rgba(255,255,255,0.1)",
       opacity: 0.88,
-      flat: mixHex(W, "#000000", 0.2),
+      edge: mixHex(bot, "#000000", 0.35),
     };
   }
   if (status === "pending") {
@@ -140,7 +140,7 @@ export function tileLook(status: Status, colors: Colors): TileLook {
       labelBg: "transparent",
       labelRing: "none",
       opacity: 1,
-      flat: base,
+      edge: mixHex(mixHex(base, "#d9dde5", 0.4), "#000000", 0.26),
     };
   }
   const T = tones(colors[status]);
@@ -157,7 +157,7 @@ export function tileLook(status: Status, colors: Colors): TileLook {
     labelBg: "rgba(255,255,255,0.62)",
     labelRing: "inset 0 0 0 1px rgba(255,255,255,0.7)",
     opacity: 1,
-    flat: T.a,
+    edge: mixHex(T.c, "#000000", 0.3),
   };
 }
 

@@ -58,11 +58,12 @@ export function Tile({
   const enter = (el: HTMLElement) => {
     setHover(true);
     el.style.setProperty("--ty", "-3px");
+    el.style.setProperty("--ey", "3px");
     if (tiltOn) el.style.setProperty("--sh", "1");
   };
   const leave = (el: HTMLElement) => {
     setHover(false);
-    for (const p of ["--mx", "--my", "--rx", "--ry", "--tx", "--ty", "--sh"]) el.style.removeProperty(p);
+    for (const p of ["--mx", "--my", "--rx", "--ry", "--tx", "--ty", "--ex", "--ey", "--sh"]) el.style.removeProperty(p);
   };
   const tilt = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (!tiltOn || e.pointerType === "touch") return;
@@ -73,10 +74,13 @@ export function Tile({
     const py = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
     el.style.setProperty("--mx", `${(px * 100).toFixed(1)}%`);
     el.style.setProperty("--my", `${(py * 100).toFixed(1)}%`);
-    el.style.setProperty("--rx", `${((0.5 - py) * 16).toFixed(2)}deg`);
-    el.style.setProperty("--ry", `${((px - 0.5) * 16).toFixed(2)}deg`);
-    el.style.setProperty("--tx", `${((px - 0.5) * 6).toFixed(1)}px`);
-    el.style.setProperty("--ty", `${(-3 + (py - 0.5) * 6).toFixed(1)}px`);
+    el.style.setProperty("--rx", `${((0.5 - py) * 13.5).toFixed(2)}deg`);
+    el.style.setProperty("--ry", `${((px - 0.5) * 13.5).toFixed(2)}deg`);
+    el.style.setProperty("--tx", `${((px - 0.5) * 5).toFixed(1)}px`);
+    el.style.setProperty("--ty", `${(-3 + (py - 0.5) * 5).toFixed(1)}px`);
+    // The side that rises toward you shows its edge: the far side from the cursor, plus the bottom as it lifts.
+    el.style.setProperty("--ex", `${((0.5 - px) * 5).toFixed(1)}px`);
+    el.style.setProperty("--ey", `${(3 + (0.5 - py) * 3).toFixed(1)}px`);
   };
 
   const surface: CSSProperties = {
@@ -94,7 +98,8 @@ export function Tile({
     borderRadius: L.radius,
     background: look.surface,
     opacity: look.opacity,
-    boxShadow: isDragging ? "0 30px 50px -18px rgba(0,0,0,0.6), 0 4px 10px rgba(0,0,0,0.2)" : look.shadow,
+    // First layer: a hard, unblurred copy of the tile shifted by --ex/--ey reads as the tile's side (0 at rest = hidden).
+    boxShadow: `var(--ex, 0px) var(--ey, 0px) 0 ${look.edge}, ${isDragging ? "0 30px 50px -18px rgba(0,0,0,0.6), 0 4px 10px rgba(0,0,0,0.2)" : look.shadow}`,
     transform: "perspective(520px) translate(var(--tx, 0px), var(--ty, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))",
     transition:
       "transform .55s cubic-bezier(.2,.9,.25,1), box-shadow .35s, opacity .3s, --mx .6s cubic-bezier(.2,.9,.25,1), --my .6s cubic-bezier(.2,.9,.25,1), --sh .45s ease",
