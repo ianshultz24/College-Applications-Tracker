@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { baseInk, statusSwatch, tileLook } from "@/lib/colors";
+import { baseInk, GOLD, statusSwatch, tileLook, type TileLook } from "@/lib/colors";
 import type { Layout } from "@/lib/layout";
 import { monogram } from "@/lib/monogram";
 import { STATUS_LABEL, STATUSES, type Colors, type School, type Status } from "@/lib/types";
@@ -97,7 +97,7 @@ export function Tile({
     isolation: "isolate",
     borderRadius: L.radius,
     background: look.surface,
-    opacity: look.opacity,
+    opacity: hover ? look.hoverOpacity : look.opacity,
     // First layer: a hard, unblurred copy of the tile shifted by --ex/--ey reads as the tile's side (0 at rest = hidden).
     boxShadow: `var(--ex, 0px) var(--ey, 0px) 0 ${look.edge}, ${isDragging ? "0 30px 50px -18px rgba(0,0,0,0.6), 0 4px 10px rgba(0,0,0,0.2)" : look.shadow}`,
     transform: "perspective(520px) translate(var(--tx, 0px), var(--ty, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))",
@@ -135,7 +135,7 @@ export function Tile({
             className="ct-tile"
             style={surface}
           >
-            <TileFace school={school} colors={colors} L={L} logoUrl={logoUrl} editAll={editAll} />
+            <TileFace school={school} colors={colors} L={L} logoUrl={logoUrl} editAll={editAll} animate={shimmer && !reduced} />
           </button>
         </div>
 
@@ -269,10 +269,18 @@ export function Tile({
   );
 }
 
-type FaceProps = { school: School; colors: Colors; L: Layout; logoUrl: string | null; editAll: boolean };
+type FaceProps = {
+  school: School;
+  colors: Colors;
+  L: Layout;
+  logoUrl: string | null;
+  editAll: boolean;
+  /** Play the status's slow resting effect (foil glint, marching ring). */
+  animate?: boolean;
+};
 
 /** What's printed on a tile: logo or monogram, sheen, rim, status pill, submitted check. */
-function TileFace({ school, colors, L, logoUrl, editAll }: FaceProps) {
+function TileFace({ school, colors, L, logoUrl, editAll, animate = false }: FaceProps) {
   const [imgFailed, setImgFailed] = useState<string | null>(null);
   const look = tileLook(school.status, colors);
   const decided = school.status !== "pending";
@@ -353,6 +361,7 @@ function TileFace({ school, colors, L, logoUrl, editAll }: FaceProps) {
           boxShadow: look.rim,
         }}
       />
+      <Finish look={look} L={L} animate={animate} seed={school.id} />
       {decided && (
         <div
           aria-hidden
@@ -408,6 +417,71 @@ function TileFace({ school, colors, L, logoUrl, editAll }: FaceProps) {
         >
           <Glyph d={CHECK_PATH} size={12} stroke={3.2} />
         </div>
+      )}
+    </>
+  );
+}
+
+// Fine paper grain for the matte finish (multiplied onto the tile).
+const GRAIN =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.42 0 0 0 0 0.4 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+
+const STAR = "M12 2.5c.5 4.6 2.6 6.8 7.2 7.3v.4c-4.6.5-6.7 2.7-7.2 7.3h-.4c-.5-4.6-2.6-6.8-7.2-7.3v-.4c4.6-.5 6.7-2.7 7.2-7.3z";
+
+/** A stable offset per tile, so resting effects don't all pulse at once. */
+function delayFor(id: string, cycle: number) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return `${-((Math.abs(h) % (cycle * 1000)) / 1000)}s`;
+}
+
+/** The status's own finish: paper grain, airmail stripes, a marching dashed ring, or gold foil. */
+function Finish({ look, L, animate, seed }: { look: TileLook; L: Layout; animate: boolean; seed: string }) {
+  const layer = { position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none" } as const;
+  return (
+    <>
+      {look.grain && <div aria-hidden style={{ ...layer, backgroundImage: GRAIN, mixBlendMode: "multiply", opacity: 0.4 }} />}
+      {look.stripes && <div aria-hidden className="ct-airmail" style={{ ...layer, ["--c" as string]: look.stripes }} />}
+      {look.ringColor && (
+        <svg aria-hidden width={L.tile} height={L.tile} style={{ ...layer, overflow: "visible" }}>
+          <rect
+            className={animate ? "ct-motion" : undefined}
+            x={4.5}
+            y={4.5}
+            width={Math.max(0, L.tile - 9)}
+            height={Math.max(0, L.tile - 9)}
+            rx={Math.max(0, L.radius - 4.5)}
+            fill="none"
+            stroke={look.ringColor}
+            strokeWidth={1.5}
+            strokeDasharray="5 6"
+            strokeLinecap="round"
+            style={animate ? { animation: "ct-dash 2.6s linear infinite", animationDelay: delayFor(seed, 2.6) } : undefined}
+          />
+        </svg>
+      )}
+      {look.ambient === "foil" && (
+        <>
+          {animate && <div aria-hidden className="ct-foil ct-motion" style={{ ...layer, animationDelay: delayFor(seed, 7) }} />}
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            className={animate ? "ct-twinkle ct-motion" : undefined}
+            style={{
+              position: "absolute",
+              top: 7,
+              right: 7,
+              width: 16,
+              height: 16,
+              fill: GOLD,
+              filter: "drop-shadow(0 0 3px rgba(255,236,170,0.9))",
+              animationDelay: animate ? delayFor(seed, 7) : undefined,
+              pointerEvents: "none",
+            }}
+          >
+            <path d={STAR} />
+          </svg>
+        </>
       )}
     </>
   );
