@@ -99,7 +99,7 @@ export function GameStage({
 
       {/* Sits exactly where the tracker's header is, so the switch feels like one bar changing. */}
       <div
-        className="pointer-events-auto absolute right-0 left-0 flex h-14 items-center justify-between gap-3 rounded-[18px] border border-white/14 bg-[rgba(22,20,18,0.5)] pr-[9px] pl-4 text-white shadow-[0_12px_32px_-14px_rgba(0,0,0,0.45)] backdrop-blur-[22px]"
+        className="pointer-events-auto absolute right-0 left-0 z-10 flex h-14 items-center justify-between gap-3 rounded-[18px] border border-white/14 bg-[rgba(22,20,18,0.5)] pr-[9px] pl-4 text-white shadow-[0_12px_32px_-14px_rgba(0,0,0,0.45)] backdrop-blur-[22px]"
         style={{ top: narrow ? 10 : 16, margin: narrow ? "0 10px" : "0 16px" }}
       >
         <div className="flex min-w-0 items-center gap-2.5">
