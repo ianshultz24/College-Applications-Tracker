@@ -45,6 +45,19 @@ export function GameStage({
     return () => window.removeEventListener("keydown", onKey);
   }, [onExit]);
 
+  // Browsers only let sound start from a tap or key press. If sound was left on last time, unlock it on the
+  // first one here, so a sound that starts later (e.g. on a timer) isn't silently blocked.
+  useEffect(() => {
+    if (!sound) return;
+    const unlock = () => audio();
+    window.addEventListener("pointerdown", unlock, { capture: true, once: true });
+    window.addEventListener("keydown", unlock, { capture: true, once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock, { capture: true });
+      window.removeEventListener("keydown", unlock, { capture: true });
+    };
+  }, [sound]);
+
   const toggleSound = () => {
     const next = !sound;
     setSound(next);
