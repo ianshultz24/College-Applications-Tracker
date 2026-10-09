@@ -1,21 +1,15 @@
 "use client";
 
-import { motion } from "motion/react";
 import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { baseInk, statusSwatch, tileLook } from "@/lib/colors";
 import type { Layout } from "@/lib/layout";
 import { monogram } from "@/lib/monogram";
 import { STATUS_LABEL, STATUSES, type Colors, type School, type Status } from "@/lib/types";
 import { CHECK_PATH, Glyph, STATUS_GLYPH } from "./glyphs";
-import { cardSpring } from "./motion";
 
 export function tileAria(school: School, editAll: boolean) {
   const state =
-    school.status !== "pending"
-      ? STATUS_LABEL[school.status]
-      : school.submitted
-        ? "submitted, awaiting decision"
-        : "not submitted yet";
+    school.status !== "pending" ? STATUS_LABEL[school.status] : school.submitted ? "submitted, awaiting decision" : "not submitted yet";
   return `${school.name}, ${state}${editAll ? ". Open to edit" : ""}`;
 }
 
@@ -56,12 +50,8 @@ export function Tile({
 }: Props) {
   const [hover, setHover] = useState(false);
   const [dotLabel, setDotLabel] = useState<string | null>(null);
-  const [imgFailed, setImgFailed] = useState<string | null>(null);
 
   const look = tileLook(school.status, colors);
-  const decided = school.status !== "pending";
-  const logo = logoUrl && imgFailed !== logoUrl ? logoUrl : null;
-  const mono = monogram(school.name, school.short_name);
   const tiltOn = shimmer && !reduced && !isDragging;
   const showName = (hover && !isDragging) || (showNames && !editAll);
 
@@ -105,8 +95,7 @@ export function Tile({
     background: look.surface,
     opacity: look.opacity,
     boxShadow: isDragging ? "0 30px 50px -18px rgba(0,0,0,0.6), 0 4px 10px rgba(0,0,0,0.2)" : look.shadow,
-    transform:
-      "perspective(520px) translate(var(--tx, 0px), var(--ty, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))",
+    transform: "perspective(520px) translate(var(--tx, 0px), var(--ty, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))",
     transition:
       "transform .55s cubic-bezier(.2,.9,.25,1), box-shadow .35s, opacity .3s, --mx .6s cubic-bezier(.2,.9,.25,1), --my .6s cubic-bezier(.2,.9,.25,1), --sh .45s ease",
     outline: "none",
@@ -114,131 +103,36 @@ export function Tile({
 
   return (
     <>
-      <div style={{ position: "relative", width: L.tile, height: L.tile }}>
-        {!isOpen && (
-          <motion.div
-            layoutId={reduced ? undefined : `tile-${school.id}`}
-            transition={cardSpring}
-            style={{ position: "relative", width: "100%", height: "100%", borderRadius: L.radius }}
+      <div data-tile-slot style={{ position: "relative", width: L.tile, height: L.tile }}>
+        {/* While its card is open the tile stays mounted (no image reload) but hidden; the slot keeps its space. */}
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            borderRadius: L.radius,
+            visibility: isOpen ? "hidden" : undefined,
+          }}
+        >
+          <button
+            type="button"
+            data-tile-btn
+            aria-label={tileAria(school, editAll)}
+            onClick={(e) => {
+              leave(e.currentTarget);
+              onOpen();
+            }}
+            onPointerEnter={(e) => enter(e.currentTarget)}
+            onPointerLeave={(e) => leave(e.currentTarget)}
+            onPointerMove={tilt}
+            onFocus={(e) => enter(e.currentTarget)}
+            onBlur={(e) => leave(e.currentTarget)}
+            className="ct-tile"
+            style={surface}
           >
-            <button
-              type="button"
-              data-tile-btn
-              aria-label={tileAria(school, editAll)}
-              onClick={onOpen}
-              onPointerEnter={(e) => enter(e.currentTarget)}
-              onPointerLeave={(e) => leave(e.currentTarget)}
-              onPointerMove={tilt}
-              onFocus={(e) => enter(e.currentTarget)}
-              onBlur={(e) => leave(e.currentTarget)}
-              className="ct-tile"
-              style={surface}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  paddingBottom: decided ? L.decidedLogoPad : 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <motion.div
-                  layoutId={reduced ? undefined : `logo-${school.id}`}
-                  transition={cardSpring}
-                  style={{ width: L.logo, height: L.logo, display: "flex", alignItems: "center", justifyContent: "center" }}
-                >
-                  {logo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={logo}
-                      alt=""
-                      draggable={false}
-                      onError={() => setImgFailed(logo)}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        pointerEvents: "none",
-                        mixBlendMode: look.blend,
-                        filter: look.logoFilter,
-                        opacity: look.logoOpacity,
-                      }}
-                    />
-                  ) : (
-                    <span
-                      className="font-serif"
-                      style={{ fontSize: L.monoFont, fontWeight: 500, lineHeight: 1, letterSpacing: "0.01em", color: look.mono }}
-                    >
-                      {mono}
-                    </span>
-                  )}
-                </motion.div>
-              </div>
-              <div
-                aria-hidden
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  pointerEvents: "none",
-                  backgroundImage: look.sheen,
-                  backgroundSize: "300% 300%",
-                  backgroundPosition: "calc(100% - var(--mx, 50%)) calc(100% - var(--my, 50%))",
-                }}
-              />
-              <div aria-hidden style={{ position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none", boxShadow: look.rim }} />
-              {decided && (
-                <div
-                  aria-hidden
-                  style={{ position: "absolute", left: 0, right: 0, bottom: L.labelBottom, display: "flex", justifyContent: "center", pointerEvents: "none" }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      height: 20,
-                      padding: "0 8px 0 7px",
-                      borderRadius: 999,
-                      background: look.labelBg,
-                      boxShadow: look.labelRing,
-                      color: look.ink,
-                      fontSize: L.labelFont,
-                      fontWeight: 600,
-                      letterSpacing: "0.01em",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <Glyph d={STATUS_GLYPH[school.status]} size={11} stroke={3} />
-                    <span>{STATUS_LABEL[school.status]}</span>
-                  </div>
-                </div>
-              )}
-              {!decided && school.submitted && !editAll && (
-                <div
-                  aria-hidden
-                  title="Submitted"
-                  style={{
-                    position: "absolute",
-                    top: 9,
-                    right: 9,
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    background: baseInk(colors),
-                    color: colors.base,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Glyph d={CHECK_PATH} size={12} stroke={3.2} />
-                </div>
-              )}
-            </button>
-          </motion.div>
-        )}
+            <TileFace school={school} colors={colors} L={L} logoUrl={logoUrl} editAll={editAll} />
+          </button>
+        </div>
 
         {!isOpen && (
           <div
@@ -352,11 +246,185 @@ export function Tile({
               );
             })}
           </div>
-          <div aria-live="polite" style={{ fontSize: 11, fontWeight: 600, color: "#ffffff", letterSpacing: "0.01em", lineHeight: "14px" }}>
+          <div
+            aria-live="polite"
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#ffffff",
+              letterSpacing: "0.01em",
+              lineHeight: "14px",
+            }}
+          >
             {dotLabel ?? STATUS_LABEL[school.status]}
           </div>
         </div>
       )}
     </>
+  );
+}
+
+type FaceProps = { school: School; colors: Colors; L: Layout; logoUrl: string | null; editAll: boolean };
+
+/** What's printed on a tile: logo or monogram, sheen, rim, status pill, submitted check. */
+function TileFace({ school, colors, L, logoUrl, editAll }: FaceProps) {
+  const [imgFailed, setImgFailed] = useState<string | null>(null);
+  const look = tileLook(school.status, colors);
+  const decided = school.status !== "pending";
+  const logo = logoUrl && imgFailed !== logoUrl ? logoUrl : null;
+  const mono = monogram(school.name, school.short_name);
+  return (
+    <>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          paddingBottom: decided ? L.decidedLogoPad : 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            width: L.logo,
+            height: L.logo,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logo}
+              alt=""
+              draggable={false}
+              onError={() => setImgFailed(logo)}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                pointerEvents: "none",
+                mixBlendMode: look.blend,
+                filter: look.logoFilter,
+                opacity: look.logoOpacity,
+              }}
+            />
+          ) : (
+            <span
+              className="font-serif"
+              style={{
+                fontSize: L.monoFont,
+                fontWeight: 500,
+                lineHeight: 1,
+                letterSpacing: "0.01em",
+                color: look.mono,
+              }}
+            >
+              {mono}
+            </span>
+          )}
+        </div>
+      </div>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          backgroundImage: look.sheen,
+          backgroundSize: "300% 300%",
+          backgroundPosition: "calc(100% - var(--mx, 50%)) calc(100% - var(--my, 50%))",
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "inherit",
+          pointerEvents: "none",
+          boxShadow: look.rim,
+        }}
+      />
+      {decided && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: L.labelBottom,
+            display: "flex",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              height: 20,
+              padding: "0 8px 0 7px",
+              borderRadius: 999,
+              background: look.labelBg,
+              boxShadow: look.labelRing,
+              color: look.ink,
+              fontSize: L.labelFont,
+              fontWeight: 600,
+              letterSpacing: "0.01em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Glyph d={STATUS_GLYPH[school.status]} size={11} stroke={3} />
+            <span>{STATUS_LABEL[school.status]}</span>
+          </div>
+        </div>
+      )}
+      {!decided && school.submitted && !editAll && (
+        <div
+          aria-hidden
+          title="Submitted"
+          style={{
+            position: "absolute",
+            top: 9,
+            right: 9,
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: baseInk(colors),
+            color: colors.base,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Glyph d={CHECK_PATH} size={12} stroke={3.2} />
+        </div>
+      )}
+    </>
+  );
+}
+
+/** A still copy of a tile (no hover, no buttons). The card starts and ends its animation looking exactly like this. */
+export function TileSkin(props: FaceProps) {
+  const look = tileLook(props.school.status, props.colors);
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+        isolation: "isolate",
+        borderRadius: props.L.radius,
+        background: look.surface,
+        opacity: look.opacity,
+      }}
+    >
+      <TileFace {...props} />
+    </div>
   );
 }

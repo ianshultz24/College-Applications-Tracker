@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGroup, MotionConfig, useReducedMotion } from "motion/react";
+import { MotionConfig, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Backend } from "@/lib/backend";
 import { computeLayout } from "@/lib/layout";
@@ -32,26 +32,32 @@ function TrackerView() {
   const [editAll, setEditAll] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [open, setOpen] = useState<OpenState | null>(null);
+  /** The tile a closing card is shrinking back into; it stays hidden until the card lands on it. */
+  const [landing, setLanding] = useState<string | null>(null);
+  const seq = useRef(0);
   const hoverId = useRef<string | null>(null);
 
-  // When the card closes, put keyboard focus back on the tile it came from.
+  const hidden = useMemo(
+    () => new Set([open?.returnId, landing].filter((id): id is string => !!id)),
+    [open?.returnId, landing],
+  );
+
+  // When the card has closed (and landed), put keyboard focus back on the tile it came from.
   const lastTarget = useRef<string | null>(null);
   useEffect(() => {
     if (open) {
       lastTarget.current = open.id ?? "__add";
       return;
     }
+    if (landing) return;
     const target = lastTarget.current;
     if (!target) return;
     lastTarget.current = null;
-    const t = setTimeout(() => {
-      const el =
-        document.querySelector<HTMLElement>(`[data-tile="${target}"] [data-tile-btn]`) ??
-        document.querySelector<HTMLElement>(`[data-tile="${target}"] button`);
-      el?.focus({ preventScroll: true });
-    }, 60);
-    return () => clearTimeout(t);
-  }, [open]);
+    const el =
+      document.querySelector<HTMLElement>(`[data-tile="${target}"] [data-tile-btn]`) ??
+      document.querySelector<HTMLElement>(`[data-tile="${target}"] button`);
+    el?.focus({ preventScroll: true });
+  }, [open, landing]);
 
   const L = useMemo(
     () => computeLayout(width || 1280, settings.tile_size, { editAll, showNames: settings.show_names }),
@@ -61,12 +67,12 @@ function TrackerView() {
   const openTile = useCallback(
     (id: string) => {
       if (open) return;
-      setOpen({ id, mode: editAll ? "edit" : "view", from: "tile", layoutKey: `tile-${id}` });
+      setOpen({ id, mode: editAll ? "edit" : "view", from: "tile", returnId: id, seq: ++seq.current });
     },
     [open, editAll],
   );
   const openAdd = useCallback(() => {
-    if (!open) setOpen({ id: null, mode: "add", from: "add", layoutKey: "tile-__add" });
+    if (!open) setOpen({ id: null, mode: "add", from: "add", returnId: "__add", seq: ++seq.current });
   }, [open]);
 
   const closeSettings = useCallback(() => {
@@ -106,7 +112,7 @@ function TrackerView() {
   const ready = width > 0;
 
   return (
-    <LayoutGroup>
+    <>
       <Background url={store.backgroundUrl} blur={settings.blur_px} dim={settings.dim} />
       <div className="relative z-[1] flow-root min-h-dvh">
         <Header
@@ -135,8 +141,7 @@ function TrackerView() {
               shimmer={settings.shimmer}
               reduced={reduced}
               editAll={editAll}
-              openId={open?.id ?? null}
-              addOpen={!!open && open.mode === "add"}
+              hidden={hidden}
               onOpen={openTile}
               onAdd={openAdd}
               onHover={(id, on) => {
@@ -148,12 +153,12 @@ function TrackerView() {
               onMove={store.moveSchool}
             />
           ) : (
-            <EmptyState L={L} addOpen={!!open && open.mode === "add"} reduced={reduced} onAdd={openAdd} />
+            <EmptyState L={L} addOpen={hidden.has("__add")} onAdd={openAdd} />
           )}
         </main>
       </div>
       <SettingsPanel open={settingsOpen} narrow={L.narrow} onClose={closeSettings} />
-      <Card open={open} setOpen={setOpen} L={L} reduced={reduced} />
-    </LayoutGroup>
+      <Card open={open} setOpen={setOpen} landing={landing} setLanding={setLanding} L={L} reduced={reduced} />
+    </>
   );
 }

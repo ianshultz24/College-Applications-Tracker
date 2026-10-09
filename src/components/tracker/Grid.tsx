@@ -14,12 +14,10 @@ import {
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Plus } from "lucide-react";
-import { motion } from "motion/react";
 import { useState } from "react";
 import type { Layout } from "@/lib/layout";
 import { positionForMove } from "@/lib/position";
 import type { Colors, School, Status } from "@/lib/types";
-import { cardSpring } from "./motion";
 import { Tile } from "./Tile";
 
 type GridProps = {
@@ -31,8 +29,8 @@ type GridProps = {
   shimmer: boolean;
   reduced: boolean;
   editAll: boolean;
-  openId: string | null;
-  addOpen: boolean;
+  /** Tiles whose card is open or still flying back into them ("__add" = the add tile). */
+  hidden: ReadonlySet<string>;
   onOpen: (id: string) => void;
   onAdd: () => void;
   /** Hover/focus anywhere on a tile's column (tile + dots) targets it for keys 1–6. */
@@ -101,7 +99,7 @@ export function Grid(props: GridProps) {
           ))}
           {editAll && (
             <li style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <AddTile L={L} hidden={props.addOpen} reduced={props.reduced} onClick={props.onAdd} label="Add school" />
+              <AddTile L={L} hidden={props.hidden.has("__add")} onClick={props.onAdd} label={addTileLabel(schools.length)} />
             </li>
           )}
         </ul>
@@ -120,6 +118,7 @@ function SortableTile({ school, dragging, ...p }: GridProps & { school: School; 
     <li
       ref={setNodeRef}
       data-tile={school.id}
+      className="ct-tile-cell"
       onPointerEnter={() => p.onHover(school.id, true)}
       onPointerLeave={() => p.onHover(school.id, false)}
       onFocus={() => p.onHover(school.id, true)}
@@ -130,9 +129,10 @@ function SortableTile({ school, dragging, ...p }: GridProps & { school: School; 
         flexDirection: "column",
         alignItems: "center",
         transform: CSS.Translate.toString(transform),
-        transition,
+        // Only set while lifted: any scale value makes the cell its own layer, which would hide hover names.
+        transition: [transition, "scale .16s ease"].filter(Boolean).join(", "),
         zIndex: isDragging ? 40 : undefined,
-        scale: isDragging ? 1.06 : 1,
+        scale: isDragging ? 1.06 : undefined,
         touchAction: p.editAll ? "manipulation" : undefined,
       }}
     >
@@ -145,7 +145,7 @@ function SortableTile({ school, dragging, ...p }: GridProps & { school: School; 
         shimmer={p.shimmer}
         reduced={p.reduced}
         editAll={p.editAll}
-        isOpen={p.openId === school.id}
+        isOpen={p.hidden.has(school.id)}
         isDragging={dragging || isDragging}
         onOpen={() => p.onOpen(school.id)}
         onStatus={(status) => p.onStatus(school.id, status)}
@@ -169,46 +169,43 @@ function SortableTile({ school, dragging, ...p }: GridProps & { school: School; 
   );
 }
 
-export function AddTile({
-  L,
-  hidden,
-  reduced,
-  onClick,
-  label,
-}: {
-  L: Layout;
-  hidden: boolean;
-  reduced: boolean;
-  onClick: () => void;
-  label: string;
-}) {
+const addLook =
+  "flex size-full flex-col items-center justify-center gap-2 border-[1.5px] border-dashed border-white/80 bg-white/16 px-2 text-center text-white";
+
+export function addTileLabel(count: number) {
+  return count > 0 ? "Add school" : "Add your first school";
+}
+
+export function AddTile({ L, hidden, onClick, label }: { L: Layout; hidden: boolean; onClick: () => void; label: string }) {
   return (
-    <div data-tile="__add" style={{ width: L.tile, height: L.tile, position: "relative" }}>
-      {!hidden && (
-        <motion.div
-          layoutId={reduced ? undefined : "tile-__add"}
-          transition={cardSpring}
-          style={{ width: "100%", height: "100%", borderRadius: L.radius }}
-        >
-          <button
-            type="button"
-            onClick={onClick}
-            className="flex size-full flex-col items-center justify-center gap-2 border-[1.5px] border-dashed border-white/80 bg-white/16 px-2 text-center text-white transition-colors hover:bg-white/26"
-            style={{ borderRadius: L.radius }}
-          >
-            <Plus size={26} strokeWidth={2} aria-hidden />
-            <span className="text-[13px] leading-tight font-semibold">{label}</span>
-          </button>
-        </motion.div>
-      )}
+    <div data-tile="__add" data-tile-slot style={{ width: L.tile, height: L.tile, position: "relative" }}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${addLook} transition-colors hover:bg-white/26`}
+        style={{ borderRadius: L.radius, visibility: hidden ? "hidden" : undefined }}
+      >
+        <Plus size={26} strokeWidth={2} aria-hidden />
+        <span className="text-[13px] leading-tight font-semibold">{label}</span>
+      </button>
     </div>
   );
 }
 
-export function EmptyState({ L, addOpen, reduced, onAdd }: { L: Layout; addOpen: boolean; reduced: boolean; onAdd: () => void }) {
+/** A still copy of the add tile for the card's animation. */
+export function AddSkin({ L, label }: { L: Layout; label: string }) {
+  return (
+    <div className={addLook} style={{ borderRadius: L.radius }}>
+      <Plus size={26} strokeWidth={2} aria-hidden />
+      <span className="text-[13px] leading-tight font-semibold">{label}</span>
+    </div>
+  );
+}
+
+export function EmptyState({ L, addOpen, onAdd }: { L: Layout; addOpen: boolean; onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center gap-[22px] text-center">
-      <AddTile L={L} hidden={addOpen} reduced={reduced} onClick={onAdd} label="Add your first school" />
+      <AddTile L={L} hidden={addOpen} onClick={onAdd} label={addTileLabel(0)} />
       <div className="flex max-w-[340px] flex-col gap-1.5 text-white [text-shadow:0_1px_16px_rgba(0,0,0,0.45)]">
         <h2 className="m-0 font-serif text-[30px] font-medium tracking-[-0.01em]">Start your list</h2>
         <p className="m-0 text-[15px] leading-[1.45] text-pretty">

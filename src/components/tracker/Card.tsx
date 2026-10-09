@@ -1,10 +1,20 @@
 "use client";
 
 import { X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { animate, AnimatePresence, motion, usePresence, type AnimationPlaybackControls } from "motion/react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { logoPath } from "@/lib/backend";
-import { tileLook } from "@/lib/colors";
 import { blankDraft, fromDraft, isDirty, toDraft, validateDraft, type Draft, type DraftLogo } from "@/lib/draft";
 import { newId } from "@/lib/id";
 import { compressLogo, imageFromDataTransfer, isImageFile } from "@/lib/images";
@@ -12,52 +22,60 @@ import type { Layout } from "@/lib/layout";
 import { positionAtEnd } from "@/lib/position";
 import type { School } from "@/lib/types";
 import { errorToast } from "../toasts";
-import { cardSpring } from "./motion";
+import { AddSkin, addTileLabel } from "./Grid";
+import { closeSpring, isOnScreen, openSpring, tileSlotRect } from "./motion";
 import { SchoolForm, type FormErrors } from "./SchoolForm";
 import { SchoolView } from "./SchoolView";
 import { useStore, type PendingLogo } from "./store";
+import { TileSkin } from "./Tile";
 
 export type OpenState = {
   id: string | null;
   mode: "view" | "edit" | "add";
   /** "view" = the form was opened from the card's Edit button (Cancel/Save go back to it). */
   from: "tile" | "view" | "add";
-  /** Shared-layout id the card morphs from/to (a tile, the add tile, or nothing). */
-  layoutKey: string;
+  /** The tile the card grew from and shrinks back into ("__add" = the add tile, null = just fade). */
+  returnId: string | null;
+  /** Bumped on every open, so a new card never reuses one that is still closing. */
+  seq: number;
 };
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),textarea,select,[tabindex]:not([tabindex="-1"])';
+const cardShadow = (a: number) => `0 40px 100px -30px rgba(0,0,0,${0.6 * a}), 0 8px 24px rgba(0,0,0,${0.16 * a})`;
+
+/** The tile a closing card is flying back into (a closing card keeps its old props, but still sees context). */
+const LandingContext = createContext<string | null>(null);
 
 export function Card({
   open,
   setOpen,
+  landing,
+  setLanding,
   L,
   reduced,
 }: {
   open: OpenState | null;
   setOpen: (next: OpenState | null | ((o: OpenState | null) => OpenState | null)) => void;
+  landing: string | null;
+  setLanding: (id: string | null) => void;
   L: Layout;
   reduced: boolean;
 }) {
   const store = useStore();
   const school = open?.id ? (store.schools.find((s) => s.id === open.id) ?? null) : null;
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   /** The active form registers a guard: returns false when it showed "Discard changes?" instead. */
   const guardRef = useRef<(() => boolean) | null>(null);
   const [formKey, setFormKey] = useState(0);
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
 
+  /** Close the card, shrinking it into `target` (default: the tile it came from; null = fade out). */
   const close = useCallback(
-    (layoutKey?: string, id?: string | null) => {
-      if (layoutKey === undefined) {
-        setOpen(null);
-        return;
-      }
-      // Point the card at its destination first, then let it go (so it morphs into that tile).
-      setOpen((o) => (o ? { ...o, layoutKey, id: id === undefined ? o.id : id } : o));
-      setTimeout(() => setOpen(null), 16);
+    (target?: string | null) => {
+      setLanding(target === undefined ? (open?.returnId ?? null) : target);
+      setOpen(null);
     },
-    [setOpen],
+    [open, setOpen, setLanding],
   );
 
   const requestClose = useCallback(() => {
@@ -80,15 +98,17 @@ export function Card({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, requestClose]);
 
-  // Lock page scroll behind the card.
+  // Lock page scroll behind the card. If a scrollbar is showing, keep its space so nothing shifts.
   const isOpen = !!open;
   useEffect(() => {
     if (!isOpen) return;
     const html = document.documentElement;
-    const prev = html.style.overflow;
+    const prev = { overflow: html.style.overflow, gutter: html.style.scrollbarGutter };
+    if (window.innerWidth > html.clientWidth) html.style.scrollbarGutter = "stable";
     html.style.overflow = "hidden";
     return () => {
-      html.style.overflow = prev;
+      html.style.overflow = prev.overflow;
+      html.style.scrollbarGutter = prev.gutter;
     };
   }, [isOpen]);
 
@@ -112,52 +132,24 @@ export function Card({
     }
   };
 
-  const flat = school ? tileLook(school.status, store.settings.colors).flat : "rgba(255,255,255,0.25)";
-  const morph = !reduced && !open?.layoutKey.startsWith("none");
   const contentKey = open ? `${open.mode}-${open.mode === "view" ? open.id : formKey}` : "none";
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="dim"
-          aria-hidden
-          onClick={requestClose}
-          className="fixed inset-0 z-30 bg-[rgba(12,11,10,0.46)]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1, transition: { duration: 0.32, ease: "easeOut" } }}
-          exit={{ opacity: 0, transition: { duration: 0.3, ease: "easeOut" } }}
-        />
-      )}
-      {open && (
-        <div
-          key="wrap"
-          className="pointer-events-none fixed inset-0 z-[31] flex items-center justify-center"
-          style={{ padding: L.overlayPad }}
-        >
+    <LandingContext.Provider value={landing}>
+      <AnimatePresence onExitComplete={() => setLanding(null)}>
+        {open && (
           <motion.div
-            ref={cardRef}
-            layoutId={morph ? open.layoutKey : undefined}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ct-card-title"
-            tabIndex={-1}
-            onKeyDown={trapTab}
-            className="pointer-events-auto relative flex max-h-full w-[min(520px,100%)] flex-col overflow-hidden text-ink outline-none"
-            style={{
-              borderRadius: L.cardRadius,
-              boxShadow: "0 40px 100px -30px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.16)",
-              outline: "none",
-            }}
-            initial={morph ? { backgroundColor: flat } : { opacity: 0, backgroundColor: "#ffffff" }}
-            animate={{ opacity: 1, backgroundColor: "#ffffff" }}
-            exit={
-              morph && !open.layoutKey.startsWith("gone")
-                ? { backgroundColor: flat, transition: { duration: 0.22, delay: 0.06 } }
-                : { opacity: 0, scale: reduced ? 1 : 0.95, transition: { duration: 0.22, ease: "easeIn" } }
-            }
-            transition={{ layout: cardSpring, default: { duration: 0.26, ease: "easeOut" } }}
-          >
+            key={`dim-${open.seq}`}
+            aria-hidden
+            onClick={requestClose}
+            className="fixed inset-0 z-30 bg-[rgba(12,11,10,0.46)]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: 0.32, ease: "easeOut" } }}
+            exit={{ opacity: 0, transition: { duration: 0.3, ease: "easeOut" } }}
+          />
+        )}
+        {open && (
+          <CardShell key={`card-${open.seq}`} startId={open.returnId} cardRef={cardRef} L={L} reduced={reduced} onKeyDown={trapTab}>
             <button
               type="button"
               onClick={requestClose}
@@ -167,61 +159,227 @@ export function Card({
               <X size={16} strokeWidth={2.2} aria-hidden />
             </button>
 
-            <motion.div
-              key={contentKey}
-              className="relative flex min-h-0 flex-1 flex-col"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1, transition: { duration: 0.24, delay: reduced ? 0 : 0.09, ease: "easeOut" } }}
-              exit={{ opacity: 0, transition: { duration: 0.12 } }}
-            >
-              {open.mode === "view" && school ? (
-                <SchoolView
-                  school={school}
-                  colors={store.settings.colors}
-                  L={L}
-                  logoUrl={store.logoUrl(school)}
-                  mySat={store.settings.my_sat}
-                  reduced={reduced}
-                  onEdit={() => {
-                    setFormKey((k) => k + 1);
-                    setOpen({ ...open, mode: "edit", from: "view" });
-                  }}
-                />
-              ) : open.mode !== "view" ? (
-                <FormPanel
-                  key={formKey}
-                  open={open}
-                  school={open.mode === "edit" ? school : null}
-                  L={L}
-                  reduced={reduced}
-                  guardRef={guardRef}
-                  savedFlash={savedFlash}
-                  onSaved={(name, another, id) => {
-                    if (another) {
-                      setSavedFlash(`Saved ${name}`);
-                      setTimeout(() => setSavedFlash(null), 2600);
+            {/* Switching view ↔ edit cross-fades; a card's first content simply arrives with the card. */}
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.div
+                key={contentKey}
+                className="relative flex min-h-0 flex-1 flex-col"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: { duration: 0.22, delay: reduced ? 0 : 0.06, ease: "easeOut" } }}
+                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+              >
+                {open.mode === "view" && school ? (
+                  <SchoolView
+                    school={school}
+                    colors={store.settings.colors}
+                    L={L}
+                    logoUrl={store.logoUrl(school)}
+                    mySat={store.settings.my_sat}
+                    onEdit={() => {
                       setFormKey((k) => k + 1);
-                      setOpen((o) =>
-                        o ? { id: null, mode: "add", from: "add", layoutKey: o.mode === "add" ? o.layoutKey : `none-${id}` } : o,
-                      );
-                    } else if (open.mode === "edit" && open.from === "view") {
-                      setOpen({ ...open, mode: "view" });
-                    } else {
-                      close(`tile-${id}`, id);
-                    }
-                  }}
-                  onCancelled={() => {
-                    if (open.mode === "edit" && open.from === "view") setOpen({ ...open, mode: "view" });
-                    else close();
-                  }}
-                  onDeleted={(id) => close(`gone-${id}`, null)}
-                />
-              ) : null}
-            </motion.div>
-          </motion.div>
+                      setOpen({ ...open, mode: "edit", from: "view" });
+                    }}
+                  />
+                ) : open.mode !== "view" ? (
+                  <FormPanel
+                    key={formKey}
+                    open={open}
+                    school={open.mode === "edit" ? school : null}
+                    L={L}
+                    reduced={reduced}
+                    guardRef={guardRef}
+                    savedFlash={savedFlash}
+                    onSaved={(name, another, id) => {
+                      if (another) {
+                        setSavedFlash(`Saved ${name}`);
+                        setTimeout(() => setSavedFlash(null), 2600);
+                        setFormKey((k) => k + 1);
+                        setOpen((o) => (o ? { ...o, id: null, mode: "add", from: "add", returnId: o.mode === "add" ? o.returnId : null } : o));
+                      } else if (open.mode === "edit" && open.from === "view") {
+                        setOpen({ ...open, mode: "view" });
+                      } else {
+                        close(id);
+                      }
+                    }}
+                    onCancelled={() => {
+                      if (open.mode === "edit" && open.from === "view") setOpen({ ...open, mode: "view" });
+                      else close();
+                    }}
+                    onDeleted={() => close(null)}
+                  />
+                ) : null}
+              </motion.div>
+            </AnimatePresence>
+          </CardShell>
+        )}
+      </AnimatePresence>
+    </LandingContext.Provider>
+  );
+}
+
+/**
+ * How the card moves between a tile and its full size. The card is always laid out at full size; only a
+ * transform shrinks it. `grow`: offset and scale that make the card cover the tile. `fade`: no tile to fly to
+ * (deleted, scrolled out of view, reduced motion), so it just fades.
+ */
+type Morph =
+  | { kind: "grow"; dx: number; dy: number; sx: number; sy: number; w: number; h: number; r0: number; r1: number }
+  | { kind: "fade"; r1: number; scale: boolean };
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+/** The positioned card. It plays its own grow-in on mount and shrink-back on exit, then tells AnimatePresence it's done. */
+function CardShell({
+  startId,
+  cardRef,
+  L,
+  reduced,
+  onKeyDown,
+  children,
+}: {
+  startId: string | null;
+  cardRef: RefObject<HTMLDivElement | null>;
+  L: Layout;
+  reduced: boolean;
+  onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
+  children: ReactNode;
+}) {
+  const [isPresent, safeToRemove] = usePresence();
+  const landing = useContext(LandingContext);
+  const target = isPresent ? startId : landing;
+  const store = useStore();
+  const elRef = useRef<HTMLDivElement>(null);
+  const skinRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const progress = useRef(0);
+  const anim = useRef<AnimationPlaybackControls | null>(null);
+  const morph = useRef<Morph>({ kind: "fade", r1: L.cardRadius, scale: !reduced });
+
+  /** Paint one frame: t = 0 looks exactly like the tile, t = 1 is the finished card. */
+  const draw = useCallback((t: number) => {
+    progress.current = t;
+    const el = elRef.current;
+    const skin = skinRef.current;
+    const body = bodyRef.current;
+    if (!el || !skin || !body) return;
+    const m = morph.current;
+    if (m.kind === "grow") {
+      const sx = m.sx + (1 - m.sx) * t;
+      const sy = m.sy + (1 - m.sy) * t;
+      const r = m.r0 + (m.r1 - m.r0) * t;
+      const solid = clamp01(t / 0.45);
+      el.style.transform = t >= 1 ? "none" : `translate(${m.dx * (1 - t)}px, ${m.dy * (1 - t)}px) scale(${sx}, ${sy})`;
+      // Divide by the scale so the corners stay round instead of stretching.
+      el.style.borderRadius = t >= 1 ? `${m.r1}px` : `${r / sx}px / ${r / sy}px`;
+      el.style.backgroundColor = `rgba(255,255,255,${solid})`;
+      el.style.boxShadow = cardShadow(t);
+      el.style.opacity = "1";
+      skin.style.width = `${m.w}px`;
+      skin.style.height = `${m.h}px`;
+      skin.style.transform = `scale(${1 / m.sx}, ${1 / m.sy})`;
+      skin.style.opacity = String(1 - solid);
+      body.style.opacity = String(clamp01((t - 0.4) / 0.6));
+    } else {
+      el.style.transform = !m.scale || t >= 1 ? "none" : `scale(${0.96 + 0.04 * t})`;
+      el.style.borderRadius = `${m.r1}px`;
+      el.style.backgroundColor = "#ffffff";
+      el.style.boxShadow = cardShadow(1);
+      el.style.opacity = String(t);
+      skin.style.opacity = "0";
+      body.style.opacity = "1";
+    }
+  }, []);
+
+  /** Work out the morph between the card's real box and tile `id`, measured right now. */
+  const measure = useCallback(
+    (id: string | null): Morph => {
+      const el = elRef.current;
+      const fade: Morph = { kind: "fade", r1: L.cardRadius, scale: !reduced };
+      const from = id && !reduced ? tileSlotRect(id) : null;
+      if (!el || !from || !isOnScreen(from)) return fade;
+      el.style.transform = "none";
+      const to = el.getBoundingClientRect();
+      if (!to.width || !to.height) return fade;
+      return {
+        kind: "grow",
+        dx: from.left + from.width / 2 - (to.left + to.width / 2),
+        dy: from.top + from.height / 2 - (to.top + to.height / 2),
+        sx: from.width / to.width,
+        sy: from.height / to.height,
+        w: from.width,
+        h: from.height,
+        r0: L.radius,
+        r1: L.cardRadius,
+      };
+    },
+    [reduced, L.radius, L.cardRadius],
+  );
+
+  // Grow in from the tile. Runs before the first paint, so the card never flashes at full size.
+  useLayoutEffect(() => {
+    morph.current = measure(startId);
+    draw(0);
+    anim.current = animate(0, 1, {
+      ...(morph.current.kind === "grow" ? openSpring : { duration: reduced ? 0.15 : 0.22, ease: "easeOut" }),
+      onUpdate: draw,
+      onComplete: () => draw(1),
+    });
+    return () => anim.current?.stop();
+    // Mount only: where the card starts is fixed the moment it appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Shrink back into the tile it's landing on (from wherever it is now), then let AnimatePresence remove it.
+  useLayoutEffect(() => {
+    if (isPresent) return;
+    anim.current?.stop();
+    const t = progress.current;
+    morph.current = measure(target);
+    draw(t);
+    anim.current = animate(t, 0, {
+      ...(morph.current.kind === "grow" ? closeSpring : { duration: reduced ? 0.15 : 0.2, ease: "easeIn" }),
+      onUpdate: draw,
+      onComplete: () => {
+        draw(0);
+        safeToRemove?.();
+      },
+    });
+  }, [isPresent, target, measure, draw, reduced, safeToRemove]);
+
+  const skinSchool = target && target !== "__add" ? store.schools.find((s) => s.id === target) : undefined;
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[31] flex items-center justify-center" style={{ padding: L.overlayPad }}>
+      <div
+        ref={(el) => {
+          elRef.current = el;
+          if (el) cardRef.current = el;
+          return () => {
+            elRef.current = null;
+            if (cardRef.current === el) cardRef.current = null;
+          };
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ct-card-title"
+        tabIndex={-1}
+        onKeyDown={onKeyDown}
+        className="relative flex max-h-full w-[min(520px,100%)] flex-col overflow-hidden text-ink outline-none"
+        style={{ pointerEvents: isPresent ? "auto" : "none", outline: "none" }}
+      >
+        {/* The tile's own face sits on top while the card is small and fades out as it grows. */}
+        <div ref={skinRef} aria-hidden className="pointer-events-none absolute top-0 left-0 z-[5]" style={{ transformOrigin: "0 0", opacity: 0 }}>
+          {skinSchool ? (
+            <TileSkin school={skinSchool} colors={store.settings.colors} L={L} logoUrl={store.logoUrl(skinSchool)} editAll={false} />
+          ) : target === "__add" ? (
+            <AddSkin L={L} label={addTileLabel(store.schools.length)} />
+          ) : null}
         </div>
-      )}
-    </AnimatePresence>
+        <div ref={bodyRef} className="relative flex min-h-0 flex-1 flex-col">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -417,7 +575,6 @@ function FormPanel({
       errors={errors}
       colors={store.settings.colors}
       L={L}
-      reduced={reduced}
       logoUrl={logoUrl}
       logoBusy={logoBusy}
       savedFlash={savedFlash}

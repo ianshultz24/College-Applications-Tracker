@@ -1,14 +1,12 @@
 "use client";
 
 import { ExternalLink, Pencil } from "lucide-react";
-import { motion } from "motion/react";
 import { plateInk, statusTone } from "@/lib/colors";
 import { countdownTo, decisionWindow, formatLocalDate, formatLocalRange } from "@/lib/dates";
 import type { Layout } from "@/lib/layout";
 import { monogram } from "@/lib/monogram";
 import { ROUND_NAME, STATUS_LABEL, type Colors, type School } from "@/lib/types";
 import { CHECK_PATH, Glyph, STATUS_GLYPH } from "./glyphs";
-import { cardSpring } from "./motion";
 
 type Fact = { label: string; value: string; sub?: string; strong?: boolean; segs?: boolean[] };
 
@@ -115,7 +113,6 @@ export function SchoolView({
   L,
   logoUrl,
   mySat,
-  reduced,
   onEdit,
 }: {
   school: School;
@@ -123,7 +120,6 @@ export function SchoolView({
   L: Layout;
   logoUrl: string | null;
   mySat: number | null;
-  reduced: boolean;
   onEdit: () => void;
 }) {
   const now = new Date();
@@ -142,10 +138,7 @@ export function SchoolView({
       <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: L.cardPad }}>
         <div className="flex items-center gap-4 pr-11">
           <div className="flex size-[72px] flex-none items-center justify-center rounded-[20px] border border-[#ebebef] bg-white">
-            <motion.div
-              layoutId={reduced ? undefined : `logo-${school.id}`}
-              transition={cardSpring}
-              className="flex size-[52px] items-center justify-center"
+            <div className="flex size-[52px] items-center justify-center"
             >
               {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -155,7 +148,7 @@ export function SchoolView({
                   {monogram(school.name, school.short_name)}
                 </span>
               )}
-            </motion.div>
+            </div>
           </div>
           <div className="flex min-w-0 flex-col gap-1">
             <h2 id="ct-card-title" className="m-0 font-serif text-[30px] leading-[1.08] font-medium tracking-[-0.012em] text-balance">

@@ -1,7 +1,16 @@
 import type { Transition } from "motion/react";
 
-/** The design's springs: open/grow (bounce .24, ~0.52s), close (bounce .06, ~0.4s). */
-export const cardSpring: Transition = { type: "spring", bounce: 0.24, duration: 0.52 };
-export const closeSpring: Transition = { type: "spring", bounce: 0.06, duration: 0.4 };
-export const reorderSpring: Transition = { type: "spring", bounce: 0.16, duration: 0.36 };
-export const fade: Transition = { duration: 0.24, ease: "easeOut" };
+/** Tile → card and back: no bounce, so it settles exactly where it lands. */
+export const openSpring: Transition = { type: "spring", bounce: 0, duration: 0.42 };
+export const closeSpring: Transition = { type: "spring", bounce: 0, duration: 0.34 };
+
+/** The resting box of a tile (or the add tile, id "__add"), ignoring any hover lift or tilt. */
+export function tileSlotRect(id: string): DOMRect | null {
+  const cell = document.querySelector<HTMLElement>(`[data-tile="${CSS.escape(id)}"]`);
+  const slot = cell?.matches("[data-tile-slot]") ? cell : cell?.querySelector<HTMLElement>("[data-tile-slot]");
+  return slot?.getBoundingClientRect() ?? null;
+}
+
+export function isOnScreen(r: DOMRect) {
+  return r.width > 0 && r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < window.innerWidth;
+}

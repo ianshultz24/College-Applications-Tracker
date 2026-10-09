@@ -1,7 +1,6 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { motion } from "motion/react";
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { plateInk, statusSwatch, statusTone } from "@/lib/colors";
 import type { Draft } from "@/lib/draft";
@@ -11,7 +10,6 @@ import { imageFromDataTransfer } from "@/lib/images";
 import { CLASSIFICATIONS, ROUNDS, STATUS_LABEL, STATUSES, type Colors, type Status } from "@/lib/types";
 import type { FieldErrors } from "@/lib/validate";
 import { CHECK_PATH, Glyph, STATUS_GLYPH } from "./glyphs";
-import { cardSpring } from "./motion";
 
 export type FormErrors = FieldErrors & { portal_url?: string };
 
@@ -161,7 +159,6 @@ function LogoSlot({
   logoUrl,
   busy,
   colors,
-  reduced,
   onFile,
   onRemove,
 }: {
@@ -169,7 +166,6 @@ function LogoSlot({
   logoUrl: string | null;
   busy: boolean;
   colors: Colors;
-  reduced: boolean;
   onFile: (file: File) => void;
   onRemove: () => void;
 }) {
@@ -201,9 +197,7 @@ function LogoSlot({
       style={{ border: over ? "1.5px dashed #17181c" : "1.5px dashed #d6d8de", background: over ? "#f3f4f6" : "#fafafb" }}
     >
       <div className="flex size-[60px] flex-none items-center justify-center rounded-2xl border border-[#ebebef] bg-white">
-        <motion.div
-          layoutId={reduced ? undefined : `logo-${draft.id}`}
-          transition={cardSpring}
+        <div
           className="flex size-11 items-center justify-center"
           style={{ opacity: busy ? 0.4 : 1 }}
         >
@@ -217,7 +211,7 @@ function LogoSlot({
           ) : (
             <Plus size={20} strokeWidth={2} color="#a3a6ae" aria-hidden />
           )}
-        </motion.div>
+        </div>
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
         <div className="text-[14px] font-medium">
@@ -256,7 +250,6 @@ export function SchoolForm({
   errors,
   colors,
   L,
-  reduced,
   logoUrl,
   logoBusy,
   savedFlash,
@@ -275,7 +268,6 @@ export function SchoolForm({
   errors: FormErrors;
   colors: Colors;
   L: Layout;
-  reduced: boolean;
   logoUrl: string | null;
   logoBusy: boolean;
   savedFlash: string | null;
@@ -324,7 +316,7 @@ export function SchoolForm({
           onPick={(status) => update((d) => ({ status, submitted: status !== "pending" ? true : d.submitted }))}
         />
 
-        <LogoSlot draft={draft} logoUrl={logoUrl} busy={logoBusy} colors={colors} reduced={reduced} onFile={onLogoFile} onRemove={onRemoveLogo} />
+        <LogoSlot draft={draft} logoUrl={logoUrl} busy={logoBusy} colors={colors} onFile={onLogoFile} onRemove={onRemoveLogo} />
 
         <div className="mt-[26px] text-[13px] font-semibold">Basics</div>
         <div className="mt-2.5 flex flex-col gap-2">

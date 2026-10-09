@@ -21,6 +21,11 @@ body {
   height: 100%;
 }
 
+/* A quiet scrollbar that matches the dark app (instead of the bright default one on Windows). */
+html {
+  scrollbar-color: rgba(255, 255, 255, 0.28) #1c1a18;
+}
+
 body {
   background: #2a2623;
   color: #17181c;
@@ -67,6 +72,12 @@ input[type="date"]::-webkit-date-and-time-value {
   outline: none;
   border-color: #17181c !important;
   box-shadow: 0 0 0 3px rgba(23, 24, 28, 0.08);
+}
+
+/* The hovered/focused tile sits above its neighbours, so its name label is never covered by the next row. */
+.ct-tile-cell:hover,
+.ct-tile-cell:focus-within {
+  z-index: 20;
 }
 
 .ct-noscrollbar {
