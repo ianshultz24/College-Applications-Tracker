@@ -2,7 +2,7 @@
 
 import { Plus, X } from "lucide-react";
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
-import { plateInk, statusSwatch, statusTone } from "@/lib/colors";
+import { GOLD, plateInk, rgba, statusDot, statusTone } from "@/lib/colors";
 import type { Draft } from "@/lib/draft";
 import type { Layout } from "@/lib/layout";
 import { monogram } from "@/lib/monogram";
@@ -118,6 +118,7 @@ function StatusPicker({ value, colors, cols, onPick }: { value: Status; colors: 
       {STATUSES.map((key, i) => {
         const sel = value === key;
         const t = statusTone(key, colors);
+        const dot = statusDot(key, colors);
         return (
           <button
             key={key}
@@ -132,20 +133,24 @@ function StatusPicker({ value, colors, cols, onPick }: { value: Status; colors: 
             onKeyDown={(e) => onKey(e, i)}
             className="flex h-[50px] items-center gap-2.5 rounded-[14px] px-3.5 text-left text-[14px] font-semibold transition-colors"
             style={{
-              border: sel ? `1.5px solid ${t.border}` : "1.5px solid #e3e4e9",
+              border: sel ? `1.5px ${key === "withdrawn" ? "dashed" : "solid"} ${t.border}` : "1.5px solid #e3e4e9",
               background: sel ? t.pillBg : "#ffffff",
               color: sel ? t.ink : "#17181c",
+              boxShadow: sel && key === "accepted" ? `inset 0 0 0 1px ${rgba(GOLD, 0.55)}, inset 0 0 14px ${rgba(GOLD, 0.28)}` : "none",
             }}
           >
-            {sel ? (
-              <Glyph d={STATUS_GLYPH[key]} size={15} />
-            ) : (
-              <span
-                aria-hidden
-                className="size-3.5 flex-none rounded-full"
-                style={{ background: statusSwatch(key, colors), boxShadow: key === "pending" ? "inset 0 0 0 1.5px #c4c6cd" : "none" }}
-              />
-            )}
+            <span
+              aria-hidden
+              className="flex size-[22px] flex-none items-center justify-center rounded-full"
+              style={{
+                background: key === "withdrawn" ? rgba(colors.withdrawn, 0.16) : dot.bg,
+                color: key === "withdrawn" ? colors.withdrawn : dot.ink,
+                border: key === "pending" ? "1.5px solid #c4c6cd" : key === "withdrawn" ? `1.5px dashed ${rgba(colors.withdrawn, 0.9)}` : "none",
+                boxSizing: "border-box",
+              }}
+            >
+              <Glyph d={STATUS_GLYPH[key]} size={12} stroke={3.2} />
+            </span>
             <span>{STATUS_LABEL[key]}</span>
           </button>
         );

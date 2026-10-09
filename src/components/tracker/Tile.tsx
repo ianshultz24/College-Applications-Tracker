@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { baseInk, GOLD, statusSwatch, tileLook, type TileLook } from "@/lib/colors";
+import { baseInk, GOLD, statusDot, tileLook, type TileLook } from "@/lib/colors";
 import type { Layout } from "@/lib/layout";
 import { monogram } from "@/lib/monogram";
 import { STATUS_LABEL, STATUSES, type Colors, type School, type Status } from "@/lib/types";
@@ -208,6 +208,8 @@ export function Tile({
           <div role="group" aria-label={`${school.name} status`} style={{ display: "flex", justifyContent: "center" }}>
             {STATUSES.map((key) => {
               const sel = school.status === key;
+              const dot = statusDot(key, colors);
+              const size = L.narrow ? 14 : 16;
               return (
                 <button
                   key={key}
@@ -236,17 +238,21 @@ export function Tile({
                 >
                   <span
                     style={{
-                      width: 12,
-                      height: 12,
+                      boxSizing: "border-box",
+                      width: size,
+                      height: size,
                       borderRadius: "50%",
-                      background: statusSwatch(key, colors),
-                      boxShadow: sel
-                        ? "0 0 0 2px rgba(20,18,16,0.9), 0 0 0 3.5px #ffffff"
-                        : key === "pending"
-                          ? "inset 0 0 0 1px rgba(0,0,0,0.3)"
-                          : "none",
+                      background: dot.bg,
+                      border: dot.border,
+                      color: dot.ink,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: sel ? "0 0 0 2px rgba(20,18,16,0.9), 0 0 0 3.5px #ffffff" : "none",
                     }}
-                  />
+                  >
+                    <Glyph d={STATUS_GLYPH[key]} size={size - 6} stroke={3.4} />
+                  </span>
                 </button>
               );
             })}

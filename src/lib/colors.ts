@@ -236,7 +236,10 @@ export function statusTone(status: Status, colors: Colors) {
   return { pillBg: t.pillBg, ink: t.ink, border: t.border, swatch: colors[status] };
 }
 
-/** Swatch color for a status dot. */
-export function statusSwatch(status: Status, colors: Colors): string {
-  return status === "pending" ? "#ffffff" : colors[status];
+/** A status picker dot: fill, glyph ink and border. Withdrawn echoes its see-through tile. */
+export function statusDot(status: Status, colors: Colors) {
+  if (status === "pending") return { bg: "#ffffff", ink: "#8b8e96", border: "1px solid rgba(0,0,0,0.28)" };
+  if (status === "withdrawn") return { bg: rgba(colors.withdrawn, 0.4), ink: "#ffffff", border: "1px dashed rgba(255,255,255,0.75)" };
+  const c = colors[status];
+  return { bg: c, ink: inkOn(c), border: "1px solid transparent" };
 }
