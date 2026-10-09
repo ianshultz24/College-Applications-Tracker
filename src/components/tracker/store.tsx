@@ -10,6 +10,9 @@ import { errorToast, undoToast } from "../toasts";
 /** A logo picked in the form: a local preview now, a storage path once uploaded. */
 export type PendingLogo = { preview: string; path: Promise<string> };
 
+/** A status the person just set (from: null = a new school added with it). Never sent for rollbacks or Undo. */
+export type StatusChange = { id: string; from: Status | null; to: Status };
+
 type Store = {
   backend: Backend;
   schools: School[];
@@ -19,6 +22,8 @@ type Store = {
   createSchool: (school: School, logo?: PendingLogo | null) => void;
   updateSchool: (id: string, fields: Partial<School>, logo?: PendingLogo | null) => void;
   setStatus: (id: string, status: Status) => void;
+  /** Listen for statuses the person changes; returns a function that stops listening. */
+  onStatusChange: (listener: (change: StatusChange) => void) => () => void;
   removeSchool: (id: string, verb?: "Removed" | "Deleted") => void;
   moveSchool: (id: string, position: number) => void;
   updateSettings: (patch: Partial<Settings>) => void;
@@ -77,6 +82,17 @@ export function TrackerProvider({
   }, []);
 
   const find = useCallback((id: string) => schoolsRef.current.find((s) => s.id === id), []);
+
+  const statusListeners = useRef(new Set<(change: StatusChange) => void>());
+  const emitStatus = useCallback((change: StatusChange) => {
+    for (const listener of statusListeners.current) listener(change);
+  }, []);
+  const onStatusChange = useCallback<Store["onStatusChange"]>((listener) => {
+    statusListeners.current.add(listener);
+    return () => {
+      statusListeners.current.delete(listener);
+    };
+  }, []);
   const replace = useCallback(
     (school: School) => setSchools((list) => list.map((s) => (s.id === school.id ? school : s)).sort(byPosition)),
     [],
@@ -87,6 +103,7 @@ export function TrackerProvider({
       dead.current.delete(school.id);
       if (logo) setPreviews((p) => ({ ...p, [school.id]: logo.preview }));
       setSchools((list) => [...list, school].sort(byPosition));
+      if (school.status !== "pending") emitStatus({ id: school.id, from: null, to: school.status });
       enqueue(school.id, async () => {
         const logo_path = logo ? await logo.path : school.logo_path;
         await backend.insertSchool({ ...school, logo_path });
@@ -97,7 +114,7 @@ export function TrackerProvider({
         errorToast(errMsg(school.name));
       });
     },
-    [backend, enqueue, find, replace],
+    [backend, enqueue, find, replace, emitStatus],
   );
 
   const updateSchool = useCallback<Store["updateSchool"]>(
@@ -109,6 +126,7 @@ export function TrackerProvider({
       if (logo) setPreviews((p) => ({ ...p, [id]: logo.preview }));
       if (removingLogo) setPreviews((p) => withoutKey(p, id));
       replace(optimistic);
+      if (fields.status && fields.status !== prev.status) emitStatus({ id, from: prev.status, to: fields.status });
 
       enqueue(id, async () => {
         const patch: Partial<School> = { ...fields };
@@ -129,7 +147,7 @@ export function TrackerProvider({
         errorToast(errMsg(prev.name));
       });
     },
-    [backend, enqueue, find, replace],
+    [backend, enqueue, find, replace, emitStatus],
   );
 
   const setStatus = useCallback<Store["setStatus"]>(
@@ -296,6 +314,7 @@ export function TrackerProvider({
       createSchool,
       updateSchool,
       setStatus,
+      onStatusChange,
       removeSchool,
       moveSchool,
       updateSettings,
@@ -304,7 +323,7 @@ export function TrackerProvider({
       clearBackground,
       exportAll,
     }),
-    [backend, schools, settings, logoUrl, backgroundUrl, createSchool, updateSchool, setStatus, removeSchool, moveSchool, updateSettings, resetSettings, setBackground, clearBackground, exportAll],
+    [backend, schools, settings, logoUrl, backgroundUrl, createSchool, updateSchool, setStatus, onStatusChange, removeSchool, moveSchool, updateSettings, resetSettings, setBackground, clearBackground, exportAll],
   );
 
   return <StoreContext value={value}>{children}</StoreContext>;

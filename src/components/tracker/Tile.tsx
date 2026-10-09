@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { baseInk, GOLD, statusDot, tileLook, type TileLook } from "@/lib/colors";
 import type { Layout } from "@/lib/layout";
 import { monogram } from "@/lib/monogram";
 import { STATUS_LABEL, STATUSES, type Colors, type School, type Status } from "@/lib/types";
 import { CHECK_PATH, Glyph, STATUS_GLYPH } from "./glyphs";
+import { playKick, useStatusKick } from "./kicks";
 
 export function tileAria(school: School, editAll: boolean) {
   const state =
@@ -52,6 +53,19 @@ export function Tile({
   const [dotLabel, setDotLabel] = useState<string | null>(null);
 
   const look = tileLook(school.status, colors);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const kick = useStatusKick(school.id);
+  const played = useRef(0);
+
+  // Play the move for a new status once the tile is in view (after a form save: once the card has landed on it).
+  useEffect(() => {
+    if (!kick || kick.seq === played.current || isOpen) return;
+    played.current = kick.seq;
+    if (reduced || !wrapRef.current || !btnRef.current) return;
+    playKick(wrapRef.current, btnRef.current, kick.to, kick.to === "pending" ? colors.base : colors[kick.to]);
+  }, [kick, isOpen, reduced, colors]);
+
   const tiltOn = shimmer && !reduced && !isDragging;
   const showName = (hover && !isDragging) || (showNames && !editAll);
 
@@ -111,6 +125,7 @@ export function Tile({
       <div data-tile-slot style={{ position: "relative", width: L.tile, height: L.tile }}>
         {/* While its card is open the tile stays mounted (no image reload) but hidden; the slot keeps its space. */}
         <div
+          ref={wrapRef}
           style={{
             position: "relative",
             width: "100%",
@@ -120,6 +135,7 @@ export function Tile({
           }}
         >
           <button
+            ref={btnRef}
             type="button"
             data-tile-btn
             aria-label={tileAria(school, editAll)}
