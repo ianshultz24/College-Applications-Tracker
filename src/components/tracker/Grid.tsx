@@ -31,6 +31,8 @@ type GridProps = {
   editAll: boolean;
   /** Tiles whose card is open or still flying back into them ("__add" = the add tile). */
   hidden: ReadonlySet<string>;
+  /** The tile the celebration has lifted a copy of. */
+  heroId: string | null;
   onOpen: (id: string) => void;
   onAdd: () => void;
   /** Hover/focus anywhere on a tile's column (tile + dots) targets it for keys 1–6. */
@@ -146,6 +148,7 @@ function SortableTile({ school, dragging, ...p }: GridProps & { school: School; 
         reduced={p.reduced}
         editAll={p.editAll}
         isOpen={p.hidden.has(school.id)}
+        hero={p.heroId === school.id}
         isDragging={dragging || isDragging}
         onOpen={() => p.onOpen(school.id)}
         onStatus={(status) => p.onStatus(school.id, status)}

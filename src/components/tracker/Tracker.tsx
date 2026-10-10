@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Backend } from "@/lib/backend";
 import { computeLayout } from "@/lib/layout";
 import { STATUSES, type School, type Settings } from "@/lib/types";
+import { audio, readSoundPref } from "../games/sound";
 import { Background } from "./Background";
 import { Card, type OpenState } from "./Card";
 import { EmptyState, Grid } from "./Grid";
@@ -16,6 +17,9 @@ import { useViewportWidth } from "./useViewportWidth";
 
 // Game Mode downloads only the first time its button is pressed; each game downloads only on Play.
 const GameMode = dynamic(() => import("../games/GameMode"), { ssr: false });
+// The Accepted celebration downloads quietly a few seconds after load, so it's ready the moment it's needed.
+const loadCelebration = () => import("../celebrate/Celebration");
+const Celebration = dynamic(loadCelebration, { ssr: false });
 
 export function Tracker(props: { backend: Backend; initialSchools: School[]; initialSettings: Settings }) {
   return (
@@ -45,6 +49,33 @@ function TrackerView() {
   const [landing, setLanding] = useState<string | null>(null);
   const seq = useRef(0);
   const hoverId = useRef<string | null>(null);
+  /** A school just became Accepted: its celebration (waits for a closing card to land on the tile). */
+  const [party, setParty] = useState<{ id: string; seq: number; sound: boolean } | null>(null);
+  /** The tile the celebration has lifted a copy of (hidden meanwhile). */
+  const [heroId, setHeroId] = useState<string | null>(null);
+  const partySeq = useRef(0);
+
+  const { onStatusChange } = store;
+  useEffect(
+    () =>
+      onStatusChange((c) => {
+        if (c.to !== "accepted") {
+          // Changed away from Accepted: drop its celebration.
+          setParty((p) => (p?.id === c.id ? null : p));
+          return;
+        }
+        const sound = readSoundPref();
+        // Start audio now, inside the click or key press, so the browser allows it.
+        if (sound) audio();
+        setParty({ id: c.id, seq: ++partySeq.current, sound });
+      }),
+    [onStatusChange],
+  );
+
+  useEffect(() => {
+    const t = setTimeout(() => void loadCelebration(), 2500);
+    return () => clearTimeout(t);
+  }, []);
 
   const hidden = useMemo(
     () => new Set([open?.returnId, landing].filter((id): id is string => !!id)),
@@ -142,6 +173,7 @@ function TrackerView() {
   }, [open, frozen, gamesOpen, settingsOpen, editAll, store, closeSettings, closeGames]);
 
   const ready = width > 0;
+  const partySchool = party ? schools.find((s) => s.id === party.id && s.status === "accepted") : undefined;
 
   return (
     <>
@@ -180,6 +212,7 @@ function TrackerView() {
               reduced={reduced}
               editAll={editAll}
               hidden={hidden}
+              heroId={heroId}
               onOpen={openTile}
               onAdd={openAdd}
               onHover={(id, on) => {
@@ -200,6 +233,21 @@ function TrackerView() {
         <GameMode drawerOpen={gamesOpen} narrow={L.narrow} reduced={reduced} onCloseDrawer={closeGames} onFrozenChange={setFrozen} />
       )}
       <Card open={open} setOpen={setOpen} landing={landing} setLanding={setLanding} L={L} reduced={reduced} />
+      {partySchool && party && landing !== party.id && (
+        <Celebration
+          key={party.seq}
+          school={partySchool}
+          colors={settings.colors}
+          L={L}
+          logoUrl={store.logoUrl(partySchool)}
+          overCard={!!open}
+          reduced={reduced}
+          sound={party.sound}
+          onHeroStart={() => setHeroId(party.id)}
+          onHeroEnd={() => setHeroId((h) => (h === party.id ? null : h))}
+          onDone={() => setParty((p) => (p?.seq === party.seq ? null : p))}
+        />
+      )}
     </>
   );
 }

@@ -25,6 +25,8 @@ type Props = {
   editAll: boolean;
   /** The card for this tile is open: keep the slot, hide the tile. */
   isOpen: boolean;
+  /** The celebration has lifted a copy of this tile: hide the tile itself (its dots and name stay). */
+  hero?: boolean;
   isDragging?: boolean;
   onOpen: () => void;
   onStatus?: (status: Status) => void;
@@ -43,6 +45,7 @@ export function Tile({
   reduced,
   editAll,
   isOpen,
+  hero = false,
   isDragging,
   onOpen,
   onStatus,
@@ -60,11 +63,11 @@ export function Tile({
 
   // Play the move for a new status once the tile is in view (after a form save: once the card has landed on it).
   useEffect(() => {
-    if (!kick || kick.seq === played.current || isOpen) return;
+    if (!kick || kick.seq === played.current || isOpen || hero) return;
     played.current = kick.seq;
     if (reduced || !wrapRef.current || !btnRef.current) return;
     playKick(wrapRef.current, btnRef.current, kick.to, kick.to === "pending" ? colors.base : colors[kick.to]);
-  }, [kick, isOpen, reduced, colors]);
+  }, [kick, isOpen, hero, reduced, colors]);
 
   const tiltOn = shimmer && !reduced && !isDragging;
   const showName = (hover && !isDragging) || (showNames && !editAll);
@@ -131,7 +134,7 @@ export function Tile({
             width: "100%",
             height: "100%",
             borderRadius: L.radius,
-            visibility: isOpen ? "hidden" : undefined,
+            visibility: isOpen || hero ? "hidden" : undefined,
           }}
         >
           <button
