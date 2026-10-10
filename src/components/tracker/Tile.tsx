@@ -6,7 +6,16 @@ import type { Layout } from "@/lib/layout";
 import { monogram } from "@/lib/monogram";
 import { STATUS_LABEL, STATUSES, type Colors, type School, type Status } from "@/lib/types";
 import { CHECK_PATH, Glyph, STATUS_GLYPH } from "./glyphs";
+import { TILT_VARS, tiltVars } from "@/lib/tilt";
 import { playKick, useStatusKick } from "./kicks";
+
+const EASE = ".55s cubic-bezier(.2,.9,.25,1)";
+
+/** The tile's side: three hard copies stepped out along --ex/--ey, so rounded corners join up like a slab. */
+const SIDE = (edge: string) =>
+  [1 / 3, 2 / 3, 1]
+    .map((k, i) => `calc(var(--ex, 0px) * ${k.toFixed(4)}) calc(var(--ey, 0px) * ${k.toFixed(4)}) 0 var(--e${i + 1}, ${edge})`)
+    .join(", ");
 
 export function tileAria(school: School, editAll: boolean) {
   const state =
@@ -79,34 +88,33 @@ export function Tile({
   // after the card closes (or from a click) doesn't count, so a mouse user's tile returns to normal.
   const pointerIn = useRef(false);
   const keyFocus = useRef(false);
-  const enter = (el: HTMLElement) => {
-    setHover(true);
+  const lift = (el: HTMLElement) => {
     el.style.setProperty("--ty", "-3px");
-    el.style.setProperty("--ey", "3px");
     if (tiltOn) el.style.setProperty("--sh", "1");
   };
-  const leave = (el: HTMLElement) => {
-    setHover(false);
-    for (const p of ["--mx", "--my", "--rx", "--ry", "--tx", "--ty", "--ex", "--ey", "--sh"]) el.style.removeProperty(p);
+  const settle = (el: HTMLElement) => {
+    for (const p of TILT_VARS) el.style.removeProperty(p);
   };
-  const sync = (el: HTMLElement) => (pointerIn.current || keyFocus.current ? enter(el) : leave(el));
-  const tilt = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!tiltOn || !pointerIn.current || e.pointerType === "touch") return;
-    const el = e.currentTarget;
-    const r = el.getBoundingClientRect();
+  const sync = () => {
+    const on = pointerIn.current || keyFocus.current;
+    setHover(on);
+    if (!btnRef.current) return;
+    if (on) lift(btnRef.current);
+    else settle(btnRef.current);
+  };
+  // Measured on the wrapper, which never tips, so the tilt can't feed back into where the cursor seems to be.
+  const aim = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const el = btnRef.current;
+    if (!el || !tiltOn || !pointerIn.current || e.pointerType === "touch") return;
+    const r = e.currentTarget.getBoundingClientRect();
     if (!r.width) return;
-    const px = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    const py = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
-    el.style.setProperty("--mx", `${(px * 100).toFixed(1)}%`);
-    el.style.setProperty("--my", `${(py * 100).toFixed(1)}%`);
-    el.style.setProperty("--rx", `${((0.5 - py) * 13.5).toFixed(2)}deg`);
-    el.style.setProperty("--ry", `${((px - 0.5) * 13.5).toFixed(2)}deg`);
-    el.style.setProperty("--tx", `${((px - 0.5) * 5).toFixed(1)}px`);
-    el.style.setProperty("--ty", `${(-3 + (py - 0.5) * 5).toFixed(1)}px`);
-    // The side that rises toward you shows its edge: the far side from the cursor, plus the bottom as it lifts.
-    el.style.setProperty("--ex", `${((0.5 - px) * 5).toFixed(1)}px`);
-    el.style.setProperty("--ey", `${(3 + (0.5 - py) * 3).toFixed(1)}px`);
+    const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+    const vars = tiltVars(clamp(((e.clientX - r.left) / r.width) * 2 - 1), clamp(((e.clientY - r.top) / r.height) * 2 - 1), look.edge);
+    for (const [p, v] of Object.entries(vars)) el.style.setProperty(p, v);
   };
+  useEffect(() => {
+    if (isDragging && btnRef.current) settle(btnRef.current);
+  }, [isDragging]);
 
   const surface: CSSProperties = {
     appearance: "none",
@@ -123,11 +131,11 @@ export function Tile({
     borderRadius: L.radius,
     background: look.surface,
     opacity: hover ? look.hoverOpacity : look.opacity,
-    // First layer: a hard, unblurred copy of the tile shifted by --ex/--ey reads as the tile's side (0 at rest = hidden).
-    boxShadow: `var(--ex, 0px) var(--ey, 0px) 0 ${look.edge}, ${isDragging ? "0 30px 50px -18px rgba(0,0,0,0.6), 0 4px 10px rgba(0,0,0,0.2)" : look.shadow}`,
+    // First three layers: hard copies of the tile stepped along --ex/--ey read as its side (0 when flat = hidden).
+    boxShadow: `${SIDE(look.edge)}, ${isDragging ? "0 30px 50px -18px rgba(0,0,0,0.6), 0 4px 10px rgba(0,0,0,0.2)" : look.shadow}`,
     transform: "perspective(520px) translate(var(--tx, 0px), var(--ty, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))",
-    transition:
-      "transform .55s cubic-bezier(.2,.9,.25,1), box-shadow .35s, opacity .3s, --mx .6s cubic-bezier(.2,.9,.25,1), --my .6s cubic-bezier(.2,.9,.25,1), --sh .45s ease",
+    // The side eases exactly like the tip, so it stays attached to it.
+    transition: `transform ${EASE}, box-shadow ${EASE}, opacity .3s, --mx ${EASE}, --my ${EASE}, --sh .45s ease`,
     outline: "none",
   };
 
@@ -144,33 +152,34 @@ export function Tile({
             borderRadius: L.radius,
             visibility: isOpen || hero ? "hidden" : undefined,
           }}
+          onPointerEnter={(e) => {
+            pointerIn.current = true;
+            sync();
+            aim(e);
+          }}
+          onPointerMove={aim}
+          onPointerLeave={() => {
+            pointerIn.current = false;
+            sync();
+          }}
         >
           <button
             ref={btnRef}
             type="button"
             data-tile-btn
             aria-label={tileAria(school, editAll)}
-            onClick={(e) => {
+            onClick={() => {
               pointerIn.current = keyFocus.current = false;
-              leave(e.currentTarget);
+              sync();
               onOpen();
             }}
-            onPointerEnter={(e) => {
-              pointerIn.current = true;
-              sync(e.currentTarget);
-            }}
-            onPointerLeave={(e) => {
-              pointerIn.current = false;
-              sync(e.currentTarget);
-            }}
-            onPointerMove={tilt}
             onFocus={(e) => {
               keyFocus.current = e.currentTarget.matches(":focus-visible");
-              sync(e.currentTarget);
+              sync();
             }}
-            onBlur={(e) => {
+            onBlur={() => {
               keyFocus.current = false;
-              sync(e.currentTarget);
+              sync();
             }}
             className="ct-tile"
             style={surface}
