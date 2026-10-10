@@ -75,6 +75,10 @@ export function Tile({
   const tiltOn = shimmer && !reduced && !isDragging;
   const showName = (hover && !isDragging) || (showNames && !editAll);
 
+  // The tile lights up while the pointer is on it, or while it has keyboard focus. Focus that comes back
+  // after the card closes (or from a click) doesn't count, so a mouse user's tile returns to normal.
+  const pointerIn = useRef(false);
+  const keyFocus = useRef(false);
   const enter = (el: HTMLElement) => {
     setHover(true);
     el.style.setProperty("--ty", "-3px");
@@ -85,8 +89,9 @@ export function Tile({
     setHover(false);
     for (const p of ["--mx", "--my", "--rx", "--ry", "--tx", "--ty", "--ex", "--ey", "--sh"]) el.style.removeProperty(p);
   };
+  const sync = (el: HTMLElement) => (pointerIn.current || keyFocus.current ? enter(el) : leave(el));
   const tilt = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    if (!tiltOn || e.pointerType === "touch") return;
+    if (!tiltOn || !pointerIn.current || e.pointerType === "touch") return;
     const el = e.currentTarget;
     const r = el.getBoundingClientRect();
     if (!r.width) return;
@@ -146,14 +151,27 @@ export function Tile({
             data-tile-btn
             aria-label={tileAria(school, editAll)}
             onClick={(e) => {
+              pointerIn.current = keyFocus.current = false;
               leave(e.currentTarget);
               onOpen();
             }}
-            onPointerEnter={(e) => enter(e.currentTarget)}
-            onPointerLeave={(e) => leave(e.currentTarget)}
+            onPointerEnter={(e) => {
+              pointerIn.current = true;
+              sync(e.currentTarget);
+            }}
+            onPointerLeave={(e) => {
+              pointerIn.current = false;
+              sync(e.currentTarget);
+            }}
             onPointerMove={tilt}
-            onFocus={(e) => enter(e.currentTarget)}
-            onBlur={(e) => leave(e.currentTarget)}
+            onFocus={(e) => {
+              keyFocus.current = e.currentTarget.matches(":focus-visible");
+              sync(e.currentTarget);
+            }}
+            onBlur={(e) => {
+              keyFocus.current = false;
+              sync(e.currentTarget);
+            }}
             className="ct-tile"
             style={surface}
           >
