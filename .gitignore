@@ -45,3 +45,5 @@ next-env.d.ts
 .agents/
 .claude/settings.local.json
 .claude/skills/
+
+.vercel
