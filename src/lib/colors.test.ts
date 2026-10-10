@@ -29,6 +29,14 @@ describe("tile looks", () => {
     expect(look.logoFilter).not.toContain("invert");
   });
 
+  it("drops the frames and glimmer when finishes are off, but keeps Withdrawn faded", () => {
+    for (const status of STATUSES) {
+      const l = tileLook(status, DEFAULT_COLORS, false);
+      expect([l.ambient, l.ringColor, l.stripes, l.grain]).toEqual([null, null, null, false]);
+    }
+    expect(tileLook("withdrawn", DEFAULT_COLORS, false).opacity).toBeLessThan(0.5);
+  });
+
   it("gives each status its own finish", () => {
     const finish = (s: (typeof STATUSES)[number]) => {
       const l = tileLook(s, DEFAULT_COLORS);

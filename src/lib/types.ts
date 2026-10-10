@@ -81,5 +81,7 @@ export type Settings = {
   tile_size: number;
   show_names: boolean;
   shimmer: boolean;
+  /** Status frames and glimmer: Accepted's gold frame and foil, Waitlisted's dashed ring, Deferred's airmail stripes, Rejected's grain. */
+  finishes: boolean;
   my_sat: number | null;
 };

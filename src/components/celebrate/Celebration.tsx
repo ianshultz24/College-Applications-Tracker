@@ -13,6 +13,7 @@ import { celebrationSounds } from "./sounds";
 export type CelebrationProps = {
   school: School;
   colors: Colors;
+  finishes: boolean;
   L: Layout;
   logoUrl: string | null;
   /** A card is open: celebrate over it instead of lifting the tile. */
@@ -50,7 +51,7 @@ function measureStage(id: string, overCard: boolean) {
  * off around it, and a banner names the school. About four seconds; it never blocks clicks, and any click or key
  * press wraps it up early. With reduced motion it's just a soft glow and the banner.
  */
-export default function Celebration({ school, colors, L, logoUrl, overCard, reduced, sound, onHeroStart, onHeroEnd, onDone }: CelebrationProps) {
+export default function Celebration({ school, colors, finishes, L, logoUrl, overCard, reduced, sound, onHeroStart, onHeroEnd, onDone }: CelebrationProps) {
   // Measured once, as it appears: the show stays put even if the page moves underneath.
   const [stage] = useState(() => measureStage(school.id, overCard));
   const { box, vw, vh } = stage;
@@ -340,7 +341,7 @@ export default function Celebration({ school, colors, L, logoUrl, overCard, redu
           aria-hidden
           style={{ ...abs, left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: L.radius, willChange: "transform" }}
         >
-          <TileSkin school={school} colors={colors} L={L} logoUrl={logoUrl} editAll={false} />
+          <TileSkin school={school} colors={colors} finishes={finishes} L={L} logoUrl={logoUrl} editAll={false} />
           <div style={{ ...abs, inset: 0, borderRadius: L.radius, overflow: "hidden" }}>
             <div
               ref={foilRef}

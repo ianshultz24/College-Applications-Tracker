@@ -209,6 +209,7 @@ function TrackerView() {
               logoUrl={store.logoUrl}
               showNames={settings.show_names}
               shimmer={settings.shimmer}
+              finishes={settings.finishes}
               reduced={reduced}
               editAll={editAll}
               hidden={hidden}
@@ -238,6 +239,7 @@ function TrackerView() {
           key={party.seq}
           school={partySchool}
           colors={settings.colors}
+          finishes={settings.finishes}
           L={L}
           logoUrl={store.logoUrl(partySchool)}
           overCard={!!open}

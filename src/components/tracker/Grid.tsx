@@ -27,6 +27,7 @@ type GridProps = {
   logoUrl: (s: School) => string | null;
   showNames: boolean;
   shimmer: boolean;
+  finishes: boolean;
   reduced: boolean;
   editAll: boolean;
   /** Tiles whose card is open or still flying back into them ("__add" = the add tile). */
@@ -145,6 +146,7 @@ function SortableTile({ school, dragging, ...p }: GridProps & { school: School; 
         logoUrl={p.logoUrl(school)}
         showNames={p.showNames}
         shimmer={p.shimmer}
+        finishes={p.finishes}
         reduced={p.reduced}
         editAll={p.editAll}
         isOpen={p.hidden.has(school.id)}

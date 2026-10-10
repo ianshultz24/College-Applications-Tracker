@@ -360,7 +360,14 @@ function CardShell({
         {/* The tile's own face sits on top while the card is small and fades out as it grows. */}
         <div ref={skinRef} aria-hidden className="pointer-events-none absolute top-0 left-0 z-[5]" style={{ transformOrigin: "0 0", opacity: 0 }}>
           {skinSchool ? (
-            <TileSkin school={skinSchool} colors={store.settings.colors} L={L} logoUrl={store.logoUrl(skinSchool)} editAll={false} />
+            <TileSkin
+              school={skinSchool}
+              colors={store.settings.colors}
+              finishes={store.settings.finishes}
+              L={L}
+              logoUrl={store.logoUrl(skinSchool)}
+              editAll={false}
+            />
           ) : target === "__add" ? (
             <AddSkin L={L} label={addTileLabel(store.schools.length)} />
           ) : null}

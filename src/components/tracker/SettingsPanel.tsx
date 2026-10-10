@@ -297,7 +297,8 @@ export function SettingsPanel({ open, narrow, onClose }: { open: boolean; narrow
             </div>
           </div>
           <Toggle on={settings.show_names} label="Always show names" onToggle={() => store.updateSettings({ show_names: !settings.show_names })} />
-          <Toggle on={settings.shimmer} label="Shimmer & sparkle effects" onToggle={() => store.updateSettings({ shimmer: !settings.shimmer })} />
+          <Toggle on={settings.shimmer} label="Glass shimmer on hover" onToggle={() => store.updateSettings({ shimmer: !settings.shimmer })} />
+          <Toggle on={settings.finishes} label="Status frames & glimmer" onToggle={() => store.updateSettings({ finishes: !settings.finishes })} />
         </div>
       </Section>
 

@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tile_size: 140,
   show_names: false,
   shimmer: true,
+  finishes: true,
   my_sat: null,
 };
 
@@ -122,8 +123,11 @@ const sheen = (a: number) =>
 
 const extras = { grain: false, ambient: null, ringColor: null, stripes: null } as const;
 
-/** The tile surface for a status: glass, plus a finish of its own so status never rests on color alone. */
-export function tileLook(status: Status, colors: Colors): TileLook {
+/**
+ * The tile surface for a status: glass, plus a finish of its own so status never rests on color alone.
+ * `finishes` off drops the extra frames and glimmer (Withdrawn stays faded and Rejected stays matte).
+ */
+export function tileLook(status: Status, colors: Colors, finishes = true): TileLook {
   const base = colors.base;
   if (status === "withdrawn") {
     // A pale, shaded ghost that lets the background show through: it doesn't matter anymore.
@@ -175,7 +179,7 @@ export function tileLook(status: Status, colors: Colors): TileLook {
     const bot = mixHex(T.C, "#ffffff", 0.68);
     return {
       ...extras,
-      grain: true,
+      grain: finishes,
       surface: `${highlight(0.28)}, linear-gradient(170deg, ${top}, ${bot})`,
       shadow: `0 8px 18px -12px ${rgba(T.C, 0.45)}, 0 1px 3px rgba(0,0,0,0.12)`,
       rim: `inset 0 0 0 1px rgba(255,255,255,0.35), inset 0 -10px 18px -14px ${rgba(T.C, 0.35)}`,
@@ -192,12 +196,12 @@ export function tileLook(status: Status, colors: Colors): TileLook {
       edge: mixHex(bot, "#000000", 0.28),
     };
   }
-  const accepted = status === "accepted";
+  const accepted = finishes && status === "accepted";
   return {
     ...extras,
-    ambient: accepted ? "foil" : status === "waitlisted" ? "march" : null,
-    ringColor: status === "waitlisted" ? rgba(T.ink, 0.42) : null,
-    stripes: status === "deferred" ? T.C : null,
+    ambient: accepted ? "foil" : finishes && status === "waitlisted" ? "march" : null,
+    ringColor: finishes && status === "waitlisted" ? rgba(T.ink, 0.42) : null,
+    stripes: finishes && status === "deferred" ? T.C : null,
     surface: `${highlight(0.85)}, radial-gradient(110% 100% at calc(120% - var(--mx, 50%)) calc(130% - var(--my, 50%)), ${rgba(T.b, 0.85)}, ${rgba(T.b, 0)} 70%), linear-gradient(160deg, ${T.a}, ${T.c})`,
     shadow: accepted
       ? `0 0 0 1px ${rgba(GOLD, 0.35)}, 0 20px 40px -14px ${rgba(T.C, 0.7)}, 0 0 26px -6px ${rgba(GOLD, 0.45)}, 0 2px 6px rgba(0,0,0,0.12)`
