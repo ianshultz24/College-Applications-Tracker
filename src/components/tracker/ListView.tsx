@@ -7,6 +7,7 @@ import { deadlineInfo, decisionInfo, DEFAULT_SORT, nextSort, SORT_KEYS, sortScho
 import { monogram } from "@/lib/monogram";
 import { ROUND_NAME, type Colors, type School } from "@/lib/types";
 import { Glyph } from "./glyphs";
+import { ListSummary } from "./ListSummary";
 import { statusPill } from "./SchoolView";
 import { usePref } from "./usePref";
 
@@ -100,6 +101,8 @@ export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Pro
           </span>
         </div>
       </div>
+
+      <ListSummary schools={schools} colors={colors} mySat={mySat} onOpen={onOpen} />
 
       <div className="overflow-x-auto pb-3">
         <table className="w-full min-w-[980px] border-collapse text-left">
