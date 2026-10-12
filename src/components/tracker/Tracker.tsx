@@ -229,6 +229,9 @@ function TrackerView() {
                 colors={settings.colors}
                 mySat={settings.my_sat}
                 logoUrl={store.logoUrl}
+                width={width || 1280}
+                narrow={L.narrow}
+                radius={L.cardRadius}
                 onOpen={openTile}
                 onAdd={openAdd}
               />

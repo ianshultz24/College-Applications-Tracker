@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deadlineInfo, decisionInfo, groupSchools, nextSort, sortSchools, summarize, type SortKey } from "./list";
+import { compactValue, deadlineInfo, decisionInfo, groupSchools, nextSort, sortSchools, summarize, visibleColumns, type SortKey } from "./list";
 import type { School } from "./types";
 
 let n = 0;
@@ -156,5 +156,29 @@ describe("short dates", () => {
     expect(deadlineInfo(school({ deadline: "2027-01-10" }), now)?.value).toBe("Jan 10, 2027");
     expect(deadlineInfo(school({ deadline: "2027-08-10" }), now, true)?.value).toBe("Aug 10, 2027");
     expect(decisionInfo(school({ decision_start: "2027-03-25", decision_end: "2027-04-01" }), now, true)?.value).toBe("Mar 25 – Apr 1");
+  });
+});
+
+describe("visibleColumns", () => {
+  it("shows everything when there's room", () => {
+    expect(visibleColumns(1180, true)).toHaveLength(10);
+  });
+  it("leaves out Portal when no school has a link", () => {
+    expect(visibleColumns(1180, false)).not.toContain("portal");
+  });
+  it("drops columns in order and always keeps School, Status and Deadline", () => {
+    expect(visibleColumns(1000, true)).toEqual(["name", "status", "deadline", "decision", "acceptance", "sat", "supplements"]);
+    expect(visibleColumns(200, true)).toEqual(["name", "status", "deadline"]);
+  });
+});
+
+describe("compactValue", () => {
+  it("shows the sorted-by value, or the deadline", () => {
+    const s = school({ deadline: "2026-10-20", acceptance_rate: 12, round: "EA" });
+    expect(compactValue(s, "acceptance", now)).toEqual({ value: "12%", sub: "Acceptance", strong: false });
+    expect(compactValue(s, "round", now)?.sub).toBe("Early Action");
+    expect(compactValue(s, "order", now)).toEqual({ value: "Oct 20", sub: "In 9 days", strong: true });
+    expect(compactValue(school({ status: "accepted", deadline: "2026-11-01" }), "name", now)?.sub).toBe("Deadline");
+    expect(compactValue(s, "sat", now)).toBeNull();
   });
 });

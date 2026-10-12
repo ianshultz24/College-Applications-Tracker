@@ -213,3 +213,62 @@ export function summarize(schools: readonly School[], mySat: number | null, now:
     sat,
   };
 }
+
+// ----- columns -----
+
+export type ColumnId = "name" | "status" | "round" | "type" | "deadline" | "decision" | "acceptance" | "sat" | "supplements" | "portal";
+
+/** The table's columns, with roughly how much room each needs. */
+export const COLUMNS: { id: ColumnId; label: string; sort?: SortKey; width: number; align?: "right" }[] = [
+  { id: "name", label: "School", sort: "name", width: 226 },
+  { id: "status", label: "Status", sort: "status", width: 170 },
+  { id: "round", label: "Round", sort: "round", width: 66 },
+  { id: "type", label: "Type", sort: "type", width: 70 },
+  { id: "deadline", label: "Deadline", sort: "deadline", width: 88 },
+  { id: "decision", label: "Decision", sort: "decision", width: 124 },
+  { id: "acceptance", label: "Acceptance", sort: "acceptance", width: 92, align: "right" },
+  { id: "sat", label: "SAT", sort: "sat", width: 156 },
+  { id: "supplements", label: "Supplements", sort: "supplements", width: 100 },
+  { id: "portal", label: "Portal", width: 64 },
+];
+
+/** Which columns give way first when the table runs out of room (School, Status and Deadline always stay). */
+const DROP_ORDER: ColumnId[] = ["portal", "round", "type", "sat", "acceptance", "decision", "supplements"];
+
+/** The columns that fit in `room` pixels. The Portal column only appears when some school has a portal link. */
+export function visibleColumns(room: number, anyPortal: boolean): ColumnId[] {
+  const shown = new Set(COLUMNS.map((c) => c.id));
+  if (!anyPortal) shown.delete("portal");
+  const need = () => COLUMNS.reduce((sum, c) => sum + (shown.has(c.id) ? c.width : 0), 0);
+  for (const id of DROP_ORDER) {
+    if (need() <= room) break;
+    shown.delete(id);
+  }
+  return COLUMNS.filter((c) => shown.has(c.id)).map((c) => c.id);
+}
+
+/** A phone row's right-hand value: whatever the list is sorted by (your deadline when the sort has no value to show). */
+export function compactValue(s: School, key: SortKey, now: Date): { value: string; sub: string; strong: boolean } | null {
+  const plain = (value: string, sub: string) => ({ value, sub, strong: false });
+  switch (key) {
+    case "round":
+      return s.round ? plain(s.round, ROUND_NAME[s.round]) : null;
+    case "type":
+      return s.classification ? plain(s.classification, "Type") : null;
+    case "acceptance":
+      return s.acceptance_rate != null ? plain(`${s.acceptance_rate}%`, "Acceptance") : null;
+    case "sat":
+      return s.sat_25 != null && s.sat_75 != null ? plain(`${s.sat_25}–${s.sat_75}`, "SAT middle 50%") : null;
+    case "supplements":
+      if (s.supplements_total) return plain(`${Math.min(s.supplements_done ?? 0, s.supplements_total)} of ${s.supplements_total}`, "Supplements");
+      return s.supplements_done ? plain(`${s.supplements_done} done`, "Supplements") : null;
+    case "decision": {
+      const d = decisionInfo(s, now, true);
+      return d ? { value: d.value, sub: d.sub ?? "Decision", strong: d.strong } : null;
+    }
+    default: {
+      const d = deadlineInfo(s, now, true);
+      return d ? { value: d.value, sub: d.sub ?? "Deadline", strong: d.strong } : null;
+    }
+  }
+}

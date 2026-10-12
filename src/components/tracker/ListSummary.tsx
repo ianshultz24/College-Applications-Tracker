@@ -16,7 +16,7 @@ const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 function Box({ label, children, wide, onClick }: { label: string; children: ReactNode; wide?: boolean; onClick?: () => void }) {
   const className = "flex min-w-0 flex-col gap-[3px] rounded-[18px] bg-[#f5f5f7] px-4 pt-3.5 pb-3.5 text-left";
-  const style = { flex: wide ? "2 1 330px" : "1 1 168px" };
+  const style = { flex: wide ? "2 1 300px" : "1 1 140px" };
   const body = (
     <>
       <span className="text-[12.5px] whitespace-nowrap text-muted">{label}</span>
@@ -83,7 +83,7 @@ export function ListSummary({
   const breakdown = shown.map((st) => `${STATUS_LABEL[st]} ${s.counts[st]}`).join(", ");
 
   return (
-    <div className="flex flex-wrap gap-3 px-6 pb-6">
+    <div className="flex flex-wrap gap-3 px-(--pad) pb-6">
       <Box label="Decisions" wide>
         <span className="text-[16.5px] font-semibold tracking-[-0.005em]">
           {s.counts.accepted} accepted <span className="font-normal text-muted">of {s.total}</span>
@@ -117,8 +117,8 @@ export function ListSummary({
         {s.supplements.total > 0 && (
           <>
             <span className="mt-2.5 flex items-baseline justify-between gap-2 text-[12.5px]">
-              <span className="text-muted">Supplements</span>
-              <span className="font-semibold tabular-nums">
+              <span className="truncate text-muted">Supplements</span>
+              <span className="font-semibold whitespace-nowrap tabular-nums">
                 {s.supplements.done} of {s.supplements.total}
               </span>
             </span>
@@ -151,7 +151,7 @@ export function ListSummary({
               </div>
             ))}
           </div>
-          <span className="mt-1.5 text-[12px] text-muted">vs. schools’ middle 50%</span>
+          <span className="mt-1.5 text-[12px] text-muted">vs. middle 50%</span>
         </Box>
       )}
     </div>

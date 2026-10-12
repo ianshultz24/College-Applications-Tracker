@@ -2,9 +2,11 @@
 
 import { ArrowDown, ArrowUp, ExternalLink, NotebookText, Plus } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { plateInk, statusTone } from "@/lib/colors";
 import {
+  COLUMNS,
+  compactValue,
   deadlineInfo,
   decisionInfo,
   DEFAULT_SORT,
@@ -16,7 +18,10 @@ import {
   SORTS,
   sortSchools,
   STATUS_ORDER,
+  visibleColumns,
+  type ColumnId,
   type DateInfo,
+  type Group,
   type GroupBy,
   type Sort,
   type SortKey,
@@ -33,12 +38,18 @@ type Props = {
   colors: Colors;
   mySat: number | null;
   logoUrl: (s: School) => string | null;
+  /** Page width and phone layout, from the tracker's layout. */
+  width: number;
+  narrow: boolean;
+  radius: number;
   onOpen: (id: string) => void;
   onAdd: () => void;
 };
 
 const SHADOW = "0 40px 100px -30px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.16)";
-const COLUMNS = 10;
+const MAX_WIDTH = 1180;
+/** Where the table's column titles stick while scrolling: just under the app header (16px margin + 56px). */
+const STICKY_TOP = 72;
 /** Rows glide to their new place when the order changes. */
 const rowMove = { type: "spring", bounce: 0, duration: 0.4 } as const;
 
@@ -70,10 +81,12 @@ function useListPrefs() {
   };
 }
 
-export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Props) {
+export function ListView({ schools, colors, mySat, logoUrl, width, narrow, radius, onOpen, onAdd }: Props) {
   const { sort, group, setSort, setGroup } = useListPrefs();
   const [chips, setChips] = useState<ReadonlySet<Chip>>(() => new Set());
   const groups = useMemo(() => groupSchools(sortSchools(schools, sort), group), [schools, sort, group]);
+  const anyPortal = schools.some((s) => s.portal_url);
+  const cols = useMemo(() => visibleColumns(Math.min(MAX_WIDTH, width - 64), anyPortal), [width, anyPortal]);
   const now = new Date();
   const satScale = useMemo(() => {
     const lows = schools.flatMap((s) => (s.sat_25 != null ? [s.sat_25] : []));
@@ -88,37 +101,20 @@ export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Pro
       if (!next.delete(c)) next.add(c);
       return next;
     });
-
-  const header = (key: SortKey, label: string, align: "left" | "right" = "left") => {
-    const active = sort.key === key;
-    return (
-      <th
-        scope="col"
-        aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-        className="px-2.5 pb-2.5 font-normal whitespace-nowrap first:pl-6 last:pr-6"
-        style={{ textAlign: align }}
-      >
-        <button
-          type="button"
-          onClick={() => setSort(nextSort(sort, key))}
-          className="-mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12.5px] hover:bg-[#f1f1f3] hover:text-ink"
-          style={{ color: active ? "#17181c" : "#6b6e76", fontWeight: active ? 600 : 400 }}
-        >
-          {label}
-          {active && (sort.dir === "asc" ? <ArrowUp size={13} strokeWidth={2.2} aria-hidden /> : <ArrowDown size={13} strokeWidth={2.2} aria-hidden />)}
-        </button>
-      </th>
-    );
-  };
+  const dimmed = (s: School) => chips.size > 0 && !matches(s, chips);
 
   return (
-    <section aria-labelledby="ct-list-title" className="w-full max-w-[1180px] self-start rounded-[28px] bg-white text-ink" style={{ boxShadow: SHADOW }}>
-      <div className="flex items-end justify-between gap-4 px-6 pt-6 pb-5">
+    <section
+      aria-labelledby="ct-list-title"
+      className="w-full self-start bg-white text-ink"
+      style={{ maxWidth: MAX_WIDTH, borderRadius: radius, boxShadow: SHADOW, "--pad": narrow ? "18px" : "24px" } as CSSProperties}
+    >
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-(--pad) pt-6 pb-5">
         <div className="flex min-w-0 items-baseline gap-3">
-          <h2 id="ct-list-title" className="m-0 font-serif text-[30px] leading-[1.08] font-medium tracking-[-0.012em]">
+          <h2 id="ct-list-title" className="m-0 font-serif leading-[1.08] font-medium tracking-[-0.012em]" style={{ fontSize: narrow ? 26 : 30 }}>
             All schools
           </h2>
-          <span className="text-[14px] text-muted">
+          <span className="text-[14px] whitespace-nowrap text-muted">
             {schools.length} {schools.length === 1 ? "school" : "schools"}
           </span>
         </div>
@@ -137,6 +133,7 @@ export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Pro
       <ListSummary schools={schools} colors={colors} mySat={mySat} onOpen={onOpen} />
 
       <Controls
+        narrow={narrow}
         schools={schools}
         colors={colors}
         sort={sort}
@@ -148,60 +145,105 @@ export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Pro
         onClearChips={() => setChips(new Set())}
       />
 
-      <div className="overflow-x-auto pb-3">
-        <table className="w-full min-w-[980px] border-collapse text-left">
-          <thead>
-            <tr>
-              {header("name", "School")}
-              {header("status", "Status")}
-              {header("round", "Round")}
-              {header("type", "Type")}
-              {header("deadline", "Deadline")}
-              {header("decision", "Decision")}
-              {header("acceptance", "Acceptance", "right")}
-              {header("sat", "SAT")}
-              {header("supplements", "Supplements")}
-              <th scope="col" className="pr-6 pb-2.5">
-                <span className="sr-only">Portal</span>
-              </th>
-            </tr>
-          </thead>
+      {narrow ? (
+        <div className="pb-2">
           {groups.map((g) => (
-            <tbody key={`${group}-${g.key}`}>
+            <div key={`${group}-${g.key}`} role="group" aria-label={group === "none" ? undefined : `${g.label}, ${g.schools.length}`}>
               {group !== "none" && (
-                <tr>
-                  <th colSpan={COLUMNS} scope="rowgroup" className="border-t border-[#efeff2] px-6 pt-5 pb-2 text-left font-normal">
-                    <span className="flex items-center gap-2">
-                      {g.status && (
-                        <span style={{ color: statusTone(g.status, colors).ink }}>
-                          <Glyph d={STATUS_GLYPH[g.status]} size={14} />
-                        </span>
-                      )}
-                      <span className="text-[15px] font-semibold">{g.label}</span>
-                      {g.sub && <span className="text-[13px] text-muted">{g.sub}</span>}
-                      <span className="text-[13px] text-muted tabular-nums">· {g.schools.length}</span>
-                    </span>
-                  </th>
-                </tr>
+                <div className="border-t border-[#efeff2] px-(--pad) pt-4 pb-1.5">
+                  <GroupLabel group={g} colors={colors} />
+                </div>
               )}
-              {g.schools.map((s) => (
-                <Row
-                  key={s.id}
-                  school={s}
-                  colors={colors}
-                  logoUrl={logoUrl(s)}
-                  mySat={mySat}
-                  satScale={satScale}
-                  now={now}
-                  dim={chips.size > 0 && !matches(s, chips)}
-                  onOpen={onOpen}
-                />
-              ))}
-            </tbody>
+              <ul className="m-0 list-none p-0">
+                {g.schools.map((s) => (
+                  <CompactRow key={s.id} school={s} colors={colors} logoUrl={logoUrl(s)} sortKey={sort.key} now={now} dim={dimmed(s)} onOpen={onOpen} />
+                ))}
+              </ul>
+            </div>
           ))}
-        </table>
-      </div>
+        </div>
+      ) : (
+        // `clip` (not `auto`) keeps anything too wide inside the card without breaking the sticky column titles.
+        <div className="overflow-x-clip pb-3">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr>
+                {COLUMNS.filter((c) => cols.includes(c.id)).map((c) => (
+                  <HeaderCell key={c.id} column={c} sort={sort} onSort={setSort} />
+                ))}
+              </tr>
+            </thead>
+            {groups.map((g) => (
+              <tbody key={`${group}-${g.key}`}>
+                {group !== "none" && (
+                  <tr>
+                    <th colSpan={cols.length} scope="rowgroup" className="border-t border-[#efeff2] px-(--pad) pt-5 pb-2 text-left font-normal">
+                      <GroupLabel group={g} colors={colors} />
+                    </th>
+                  </tr>
+                )}
+                {g.schools.map((s) => (
+                  <Row
+                    key={s.id}
+                    school={s}
+                    cols={cols}
+                    colors={colors}
+                    logoUrl={logoUrl(s)}
+                    mySat={mySat}
+                    satScale={satScale}
+                    now={now}
+                    dim={dimmed(s)}
+                    onOpen={onOpen}
+                  />
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </div>
+      )}
     </section>
+  );
+}
+
+function HeaderCell({ column: c, sort, onSort }: { column: (typeof COLUMNS)[number]; sort: Sort; onSort: (s: Sort) => void }) {
+  const cls = "sticky z-[2] bg-white px-2.5 pt-2 pb-2.5 font-normal whitespace-nowrap shadow-[inset_0_-1px_0_#efeff2] first:pl-(--pad) last:pr-(--pad)";
+  const style = { top: STICKY_TOP, textAlign: c.align ?? "left" } as const;
+  if (!c.sort) {
+    return (
+      <th scope="col" className={cls} style={style}>
+        <span className="sr-only">{c.label}</span>
+      </th>
+    );
+  }
+  const key = c.sort;
+  const active = sort.key === key;
+  return (
+    <th scope="col" aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"} className={cls} style={style}>
+      <button
+        type="button"
+        onClick={() => onSort(nextSort(sort, key))}
+        className="-mx-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12.5px] hover:bg-[#f1f1f3] hover:text-ink"
+        style={{ color: active ? "#17181c" : "#6b6e76", fontWeight: active ? 600 : 400 }}
+      >
+        {c.label}
+        {active && (sort.dir === "asc" ? <ArrowUp size={13} strokeWidth={2.2} aria-hidden /> : <ArrowDown size={13} strokeWidth={2.2} aria-hidden />)}
+      </button>
+    </th>
+  );
+}
+
+function GroupLabel({ group: g, colors }: { group: Group; colors: Colors }) {
+  return (
+    <span className="flex items-center gap-2">
+      {g.status && (
+        <span style={{ color: statusTone(g.status, colors).ink }}>
+          <Glyph d={STATUS_GLYPH[g.status]} size={14} />
+        </span>
+      )}
+      <span className="text-[15px] font-semibold">{g.label}</span>
+      {g.sub && <span className="truncate text-[13px] text-muted">{g.sub}</span>}
+      <span className="text-[13px] text-muted tabular-nums">· {g.schools.length}</span>
+    </span>
   );
 }
 
@@ -209,6 +251,7 @@ const segBtn = "h-full rounded-[9px] px-3 text-[13px] font-medium whitespace-now
 
 /** Highlight chips on the left; grouping and the sort menu on the right. */
 function Controls({
+  narrow,
   schools,
   colors,
   sort,
@@ -219,6 +262,7 @@ function Controls({
   onChip,
   onClearChips,
 }: {
+  narrow: boolean;
   schools: School[];
   colors: Colors;
   sort: Sort;
@@ -233,8 +277,17 @@ function Controls({
   const options: Chip[] = [...STATUS_ORDER.filter((st) => count(st) > 0), ...(count("unsubmitted") > 0 ? (["unsubmitted"] as const) : [])];
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 pb-4">
-      <div role="group" aria-label="Highlight schools" className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-(--pad) pb-4">
+      {/* On a phone the chips sit in one row you can swipe sideways. */}
+      <div
+        role="group"
+        aria-label="Highlight schools"
+        className={
+          narrow
+            ? "ct-noscrollbar -mx-(--pad) flex w-[calc(100%+2*var(--pad))] items-center gap-1.5 overflow-x-auto px-(--pad)"
+            : "flex flex-wrap items-center gap-1.5"
+        }
+      >
         {options.map((c) => {
           const on = chips.has(c);
           const tone = c === "unsubmitted" ? null : statusTone(c, colors);
@@ -244,7 +297,7 @@ function Controls({
               type="button"
               aria-pressed={on}
               onClick={() => onChip(c)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] whitespace-nowrap transition-colors hover:bg-[#f5f5f7]"
+              className="inline-flex h-8 flex-none items-center gap-1.5 rounded-full border px-3 text-[13px] whitespace-nowrap transition-colors hover:bg-[#f5f5f7]"
               style={{
                 background: on ? (tone?.pillBg ?? "#eef0f3") : undefined,
                 borderColor: on ? (tone?.border ?? "#17181c") : "#e3e4e9",
@@ -261,7 +314,7 @@ function Controls({
           );
         })}
         {chips.size > 0 && (
-          <button type="button" onClick={onClearChips} className="h-8 rounded-full px-2.5 text-[13px] font-medium text-subtle hover:bg-[#f5f5f7] hover:text-ink">
+          <button type="button" onClick={onClearChips} className="h-8 flex-none rounded-full px-2.5 text-[13px] font-medium text-subtle hover:bg-[#f5f5f7] hover:text-ink">
             Clear
           </button>
         )}
@@ -331,7 +384,7 @@ function Controls({
 const Empty = () => <span className="text-[14px] text-[#b4b6bd]">—</span>;
 
 function Cell({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <td className={`px-2.5 py-3 align-middle first:pl-6 last:pr-6 ${className}`}>{children}</td>;
+  return <td className={`px-2.5 py-3 align-middle first:pl-(--pad) last:pr-(--pad) ${className}`}>{children}</td>;
 }
 
 function DateCell({ info }: { info: DateInfo | null }) {
@@ -348,8 +401,42 @@ function DateCell({ info }: { info: DateInfo | null }) {
   );
 }
 
+/** The school's logo on a small white plate (initials when there's no logo), like the card's. */
+function Plate({ school: s, colors, logoUrl }: { school: School; colors: Colors; logoUrl: string | null }) {
+  const mono = monogram(s.name, s.short_name);
+  return (
+    <span className="flex size-10 flex-none items-center justify-center rounded-[12px] border border-[#ebebef] bg-white">
+      {logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logoUrl} alt="" className="size-[30px] object-contain" />
+      ) : (
+        <span
+          className="font-serif leading-none font-medium"
+          style={{ color: plateInk(colors), fontSize: mono.length > 3 ? 11.5 : mono.length > 2 ? 13.5 : 17 }}
+        >
+          {mono}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Pill({ school, colors, small }: { school: School; colors: Colors; small?: boolean }) {
+  const pill = statusPill(school, colors, true);
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 self-start rounded-full font-semibold whitespace-nowrap"
+      style={{ background: pill.bg, color: pill.fg, height: small ? 22 : 26, padding: small ? "0 8px" : "0 10px", fontSize: small ? 12 : 12.5 }}
+    >
+      <Glyph d={pill.glyph} size={small ? 11 : 12} />
+      {pill.label}
+    </span>
+  );
+}
+
 function Row({
   school: s,
+  cols,
   colors,
   logoUrl,
   mySat,
@@ -359,6 +446,7 @@ function Row({
   onOpen,
 }: {
   school: School;
+  cols: ColumnId[];
   colors: Colors;
   logoUrl: string | null;
   mySat: number | null;
@@ -368,31 +456,14 @@ function Row({
   dim: boolean;
   onOpen: (id: string) => void;
 }) {
-  const pill = statusPill(s, colors, true);
-  const mono = monogram(s.name, s.short_name);
   const hasNotes = !!s.notes || s.custom_fields.length > 0;
   const done = s.supplements_total ? Math.min(s.supplements_done ?? 0, s.supplements_total) : 0;
 
-  return (
-    <motion.tr
-      layout="position"
-      transition={rowMove}
-      data-tile={s.id}
-      onClick={() => onOpen(s.id)}
-      className={`cursor-pointer border-t border-[#efeff2] transition-[background-color,opacity] duration-200 hover:bg-[#f7f7f9] ${dim ? "ct-dim" : ""}`}
-    >
+  const cell: Record<ColumnId, () => ReactNode> = {
+    name: () => (
       <Cell>
-        <div className="flex min-w-[184px] items-center gap-3">
-          <div className="flex size-10 flex-none items-center justify-center rounded-[12px] border border-[#ebebef] bg-white">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt="" className="size-[30px] object-contain" />
-            ) : (
-              <span className="font-serif leading-none font-medium" style={{ color: plateInk(colors), fontSize: mono.length > 3 ? 11.5 : mono.length > 2 ? 13.5 : 17 }}>
-                {mono}
-              </span>
-            )}
-          </div>
+        <div className="flex min-w-[180px] items-center gap-3">
+          <Plate school={s} colors={colors} logoUrl={logoUrl} />
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="flex items-center gap-1.5">
               <button
@@ -416,29 +487,43 @@ function Row({
           </div>
         </div>
       </Cell>
+    ),
+    status: () => (
       <Cell>
-        <span
-          className="inline-flex h-[26px] items-center gap-1.5 rounded-full px-2.5 text-[12.5px] font-semibold whitespace-nowrap"
-          style={{ background: pill.bg, color: pill.fg }}
-        >
-          <Glyph d={pill.glyph} size={12} />
-          {pill.label}
-        </span>
+        <Pill school={s} colors={colors} />
       </Cell>
-      <Cell>{s.round ? <strong className="text-[14px] font-semibold" title={ROUND_NAME[s.round]}>{s.round}</strong> : <Empty />}</Cell>
-      <Cell>{s.classification ? <span className="text-[14px] whitespace-nowrap">{s.classification}</span> : <Empty />}</Cell>
+    ),
+    round: () => (
+      <Cell>
+        {s.round ? (
+          <strong className="text-[14px] font-semibold" title={ROUND_NAME[s.round]}>
+            {s.round}
+          </strong>
+        ) : (
+          <Empty />
+        )}
+      </Cell>
+    ),
+    type: () => <Cell>{s.classification ? <span className="text-[14px] whitespace-nowrap">{s.classification}</span> : <Empty />}</Cell>,
+    deadline: () => (
       <Cell>
         <DateCell info={deadlineInfo(s, now, true)} />
       </Cell>
+    ),
+    decision: () => (
       <Cell>
         <DateCell info={decisionInfo(s, now, true)} />
       </Cell>
+    ),
+    acceptance: () => (
       <Cell className="text-right">
         {s.acceptance_rate != null ? <span className="text-[14.5px] font-semibold tabular-nums">{s.acceptance_rate}%</span> : <Empty />}
       </Cell>
-      <Cell>
-        {s.sat_25 != null && s.sat_75 != null ? <MiniSat lo25={s.sat_25} hi75={s.sat_75} you={mySat} scale={satScale} /> : <Empty />}
-      </Cell>
+    ),
+    sat: () => (
+      <Cell>{s.sat_25 != null && s.sat_75 != null ? <MiniSat lo25={s.sat_25} hi75={s.sat_75} you={mySat} scale={satScale} /> : <Empty />}</Cell>
+    ),
+    supplements: () => (
       <Cell>
         {s.supplements_total ? (
           <div className="flex flex-col gap-1.5">
@@ -457,6 +542,8 @@ function Row({
           <Empty />
         )}
       </Cell>
+    ),
+    portal: () => (
       <Cell>
         {s.portal_url && (
           <a
@@ -472,7 +559,70 @@ function Row({
           </a>
         )}
       </Cell>
+    ),
+  };
+
+  return (
+    <motion.tr
+      layout="position"
+      transition={rowMove}
+      data-tile={s.id}
+      onClick={() => onOpen(s.id)}
+      className={`cursor-pointer border-t border-[#efeff2] transition-[background-color,opacity] duration-200 hover:bg-[#f7f7f9] ${dim ? "ct-dim" : ""}`}
+    >
+      {cols.map((id) => (
+        <Fragment key={id}>{cell[id]()}</Fragment>
+      ))}
     </motion.tr>
+  );
+}
+
+/** A phone row: logo, name and status, with whatever the list is sorted by on the right. Tap for the card. */
+function CompactRow({
+  school: s,
+  colors,
+  logoUrl,
+  sortKey,
+  now,
+  dim,
+  onOpen,
+}: {
+  school: School;
+  colors: Colors;
+  logoUrl: string | null;
+  sortKey: SortKey;
+  now: Date;
+  dim: boolean;
+  onOpen: (id: string) => void;
+}) {
+  const v = compactValue(s, sortKey, now);
+  return (
+    <motion.li layout="position" transition={rowMove} data-tile={s.id} className={`border-t border-[#efeff2] transition-opacity duration-200 ${dim ? "ct-dim" : ""}`}>
+      <button
+        type="button"
+        data-tile-btn
+        onClick={() => onOpen(s.id)}
+        className="flex w-full items-center gap-3 px-(--pad) py-3 text-left transition-colors hover:bg-[#f7f7f9] active:bg-[#f1f1f3]"
+      >
+        <Plate school={s} colors={colors} logoUrl={logoUrl} />
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate text-[15px] font-semibold tracking-[-0.005em]">{s.name}</span>
+          <Pill school={s} colors={colors} small />
+        </span>
+        <span className="flex max-w-[44%] flex-none flex-col items-end gap-0.5 text-right">
+          {v ? (
+            <>
+              <span className="text-[14.5px] font-semibold whitespace-nowrap tabular-nums">{v.value}</span>
+              <span className="truncate text-[12px]" style={{ color: v.strong ? "#17181c" : "#6b6e76", fontWeight: v.strong ? 600 : 400 }}>
+                {v.sub}
+              </span>
+            </>
+          ) : (
+            <Empty />
+          )}
+        </span>
+      </button>
+    </motion.li>
   );
 }
 
