@@ -1,12 +1,21 @@
 "use client";
 
-import { Gamepad2, Pencil, Settings as Gear } from "lucide-react";
+import { Gamepad2, LayoutGrid, Pencil, Rows3, Settings as Gear } from "lucide-react";
 
 const iconBtn =
   "flex size-[38px] items-center justify-center rounded-xl border border-white/14 text-white transition-colors hover:bg-white/18";
 
+export type View = "grid" | "list";
+
+const VIEWS = [
+  { id: "grid", label: "Grid view", Icon: LayoutGrid },
+  { id: "list", label: "List view", Icon: Rows3 },
+] as const;
+
 export function Header({
   narrow,
+  view,
+  onView,
   editAll,
   settingsOpen,
   gamesOpen,
@@ -16,6 +25,8 @@ export function Header({
   canEdit,
 }: {
   narrow: boolean;
+  view: View;
+  onView: (view: View) => void;
   editAll: boolean;
   settingsOpen: boolean;
   gamesOpen: boolean;
@@ -33,6 +44,24 @@ export function Header({
         College Tracker
       </h1>
       <div className="flex items-center gap-2">
+        {!editAll && (
+          <div role="group" aria-label="View" className="flex h-[38px] items-center gap-0.5 rounded-xl border border-white/14 bg-white/8 p-[3px]">
+            {VIEWS.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onView(id)}
+                aria-label={label}
+                aria-pressed={view === id}
+                title={label}
+                className="flex h-full w-[34px] items-center justify-center rounded-[9px] text-white transition-colors hover:bg-white/14"
+                style={{ background: view === id ? "rgba(255,255,255,0.26)" : undefined }}
+              >
+                <Icon size={17} strokeWidth={1.9} aria-hidden />
+              </button>
+            ))}
+          </div>
+        )}
         {!editAll && (
           <button
             type="button"
@@ -56,7 +85,8 @@ export function Header({
             Done
           </button>
         ) : (
-          canEdit && (
+          canEdit &&
+          view === "grid" && (
             <button
               type="button"
               onClick={onToggleEdit}

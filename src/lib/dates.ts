@@ -99,11 +99,15 @@ export function decisionWindow(
 const SHORT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 const SHORT_YEAR = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
 
-/** "Nov 1" (adds the year when it isn't the current year). */
-export function formatLocalDate(value: string | null | undefined, now: Date = new Date()): string {
+/**
+ * "Nov 1" (adds the year when it isn't the current year).
+ * `near`: leave the year off for anything within six months of today, too (the List view's tighter columns).
+ */
+export function formatLocalDate(value: string | null | undefined, now: Date = new Date(), near = false): string {
   const d = parseLocalDate(value);
   if (!d) return "";
-  return (d.getFullYear() === now.getFullYear() ? SHORT : SHORT_YEAR).format(d);
+  const soon = near && Math.abs(calendarDaysBetween(now, d)) <= 183;
+  return (soon || d.getFullYear() === now.getFullYear() ? SHORT : SHORT_YEAR).format(d);
 }
 
 /** "Mar 15 – Apr 1" or a single date. */
@@ -111,7 +115,8 @@ export function formatLocalRange(
   start: string | null | undefined,
   end: string | null | undefined,
   now: Date = new Date(),
+  near = false,
 ): string {
-  if (start && end && start !== end) return `${formatLocalDate(start, now)} – ${formatLocalDate(end, now)}`;
-  return formatLocalDate(start || end, now);
+  if (start && end && start !== end) return `${formatLocalDate(start, now, near)} – ${formatLocalDate(end, now, near)}`;
+  return formatLocalDate(start || end, now, near);
 }

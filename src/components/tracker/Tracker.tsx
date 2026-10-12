@@ -10,9 +10,11 @@ import { audio, readSoundPref } from "../games/sound";
 import { Background } from "./Background";
 import { Card, type OpenState } from "./Card";
 import { EmptyState, Grid } from "./Grid";
-import { Header } from "./Header";
+import { Header, type View } from "./Header";
+import { ListView } from "./ListView";
 import { SettingsPanel } from "./SettingsPanel";
 import { TrackerProvider, useStore } from "./store";
+import { usePref } from "./usePref";
 import { useViewportWidth } from "./useViewportWidth";
 
 // Game Mode downloads only the first time its button is pressed; each game downloads only on Play.
@@ -38,6 +40,11 @@ function TrackerView() {
   const width = useViewportWidth();
 
   const [editAll, setEditAll] = useState(false);
+  /** Grid of tiles or the List view (remembered on this device). */
+  const [viewPref, setViewPref] = usePref("ct-view");
+  const view: View = viewPref === "list" ? "list" : "grid";
+  /** The view was switched (not just loaded), so the new one fades in. */
+  const [switched, setSwitched] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gamesOpen, setGamesOpen] = useState(false);
   /** Stays true once Game Mode has been opened, so its code is fetched once and the drawer can slide out. */
@@ -142,6 +149,17 @@ function TrackerView() {
     wasFrozen.current = frozen;
   }, [frozen]);
 
+  const changeView = useCallback(
+    (next: View) => {
+      if (open) return;
+      // Edit all is for rearranging tiles, so it belongs to the grid.
+      if (next === "list") setEditAll(false);
+      setSwitched(true);
+      setViewPref(next);
+    },
+    [open, setViewPref],
+  );
+
   const toggleEdit = useCallback(() => {
     if (open) return;
     setEditAll((v) => !v);
@@ -181,6 +199,8 @@ function TrackerView() {
       <div className="relative z-[1] flow-root min-h-dvh" inert={frozen} aria-hidden={frozen || undefined}>
         <Header
           narrow={L.narrow}
+          view={view}
+          onView={changeView}
           editAll={editAll}
           settingsOpen={settingsOpen}
           gamesOpen={gamesOpen}
@@ -194,36 +214,50 @@ function TrackerView() {
           onToggleGames={toggleGames}
         />
         <main
-          className="flex items-center justify-center"
+          className="flex justify-center"
           style={{
+            alignItems: view === "list" && schools.length > 0 ? "flex-start" : "center",
             minHeight: L.narrow ? "calc(100dvh - 66px)" : "calc(100dvh - 72px)",
             padding: L.narrow ? "22px 16px 44px" : "28px 32px 56px",
             visibility: ready ? "visible" : "hidden",
           }}
         >
-          {!ready ? null : schools.length > 0 ? (
-            <Grid
-              schools={schools}
-              colors={settings.colors}
-              L={L}
-              logoUrl={store.logoUrl}
-              showNames={settings.show_names}
-              shimmer={settings.shimmer}
-              finishes={settings.finishes}
-              reduced={reduced}
-              editAll={editAll}
-              hidden={hidden}
-              heroId={heroId}
-              onOpen={openTile}
-              onAdd={openAdd}
-              onHover={(id, on) => {
-                if (on) hoverId.current = id;
-                else if (hoverId.current === id) hoverId.current = null;
-              }}
-              onStatus={store.setStatus}
-              onRemove={(id) => store.removeSchool(id, "Removed")}
-              onMove={store.moveSchool}
-            />
+          {!ready ? null : schools.length > 0 && view === "list" ? (
+            <div key="list" className="flex w-full justify-center" style={{ animation: switched ? "ct-fade-in .28s ease-out" : undefined }}>
+              <ListView
+                schools={schools}
+                colors={settings.colors}
+                mySat={settings.my_sat}
+                logoUrl={store.logoUrl}
+                onOpen={openTile}
+                onAdd={openAdd}
+              />
+            </div>
+          ) : schools.length > 0 ? (
+            <div key="grid" style={{ animation: switched ? "ct-fade-in .28s ease-out" : undefined }}>
+              <Grid
+                schools={schools}
+                colors={settings.colors}
+                L={L}
+                logoUrl={store.logoUrl}
+                showNames={settings.show_names}
+                shimmer={settings.shimmer}
+                finishes={settings.finishes}
+                reduced={reduced}
+                editAll={editAll}
+                hidden={hidden}
+                heroId={heroId}
+                onOpen={openTile}
+                onAdd={openAdd}
+                onHover={(id, on) => {
+                  if (on) hoverId.current = id;
+                  else if (hoverId.current === id) hoverId.current = null;
+                }}
+                onStatus={store.setStatus}
+                onRemove={(id) => store.removeSchool(id, "Removed")}
+                onMove={store.moveSchool}
+              />
+            </div>
           ) : (
             <EmptyState L={L} addOpen={hidden.has("__add")} onAdd={openAdd} />
           )}

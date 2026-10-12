@@ -2,48 +2,20 @@
 
 import { ExternalLink, Pencil } from "lucide-react";
 import { plateInk, statusTone } from "@/lib/colors";
-import { countdownTo, decisionWindow, formatLocalDate, formatLocalRange } from "@/lib/dates";
 import type { Layout } from "@/lib/layout";
+import { deadlineInfo, decisionInfo } from "@/lib/list";
 import { monogram } from "@/lib/monogram";
 import { ROUND_NAME, STATUS_LABEL, type Colors, type School } from "@/lib/types";
 import { CHECK_PATH, Glyph, STATUS_GLYPH } from "./glyphs";
 
 type Fact = { label: string; value: string; sub?: string; strong?: boolean; segs?: boolean[] };
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
 function facts(s: School, now: Date): Fact[] {
   const out: Fact[] = [];
-  const decided = s.status !== "pending";
-
-  if (s.deadline) {
-    let sub: string | undefined;
-    let strong = false;
-    if (!decided && !s.submitted) {
-      const c = countdownTo(s.deadline, now);
-      if (c) {
-        sub = cap(c.label);
-        strong = !c.past && c.days <= 14;
-      }
-    } else if (!decided && s.submitted) sub = "Submitted";
-    out.push({ label: "Deadline", value: formatLocalDate(s.deadline, now), sub, strong });
-  }
-
-  if (s.decision_start || s.decision_end) {
-    const range = !!(s.decision_start && s.decision_end && s.decision_start !== s.decision_end);
-    let sub: string | undefined;
-    if (!decided) {
-      const w = decisionWindow(s.decision_start, s.decision_end, now);
-      if (w?.phase === "upcoming") sub = cap(w.countdown.label);
-      else if (w?.phase === "open") sub = range ? `Open now · ends ${w.countdown.label}` : "Expected today";
-      else if (w?.phase === "passed") sub = "Should be out";
-    }
-    out.push({
-      label: range ? "Decision window" : "Decision",
-      value: formatLocalRange(s.decision_start, s.decision_end, now),
-      sub,
-    });
-  }
+  const deadline = deadlineInfo(s, now);
+  if (deadline) out.push({ label: "Deadline", ...deadline });
+  const decision = decisionInfo(s, now);
+  if (decision) out.push({ label: decision.range ? "Decision window" : "Decision", value: decision.value, sub: decision.sub });
 
   if (s.acceptance_rate != null) out.push({ label: "Acceptance", value: `${s.acceptance_rate}%` });
 
@@ -107,6 +79,17 @@ function SatBar({ lo25, hi75, you }: { lo25: number; hi75: number; you: number |
   );
 }
 
+/** The status pill's colors, glyph and words (undecided schools say whether they've been submitted). */
+export function statusPill(school: School, colors: Colors, short = false) {
+  if (school.status !== "pending") {
+    const tone = statusTone(school.status, colors);
+    return { bg: tone.pillBg, fg: tone.ink, label: STATUS_LABEL[school.status], glyph: STATUS_GLYPH[school.status] };
+  }
+  return school.submitted
+    ? { bg: "#eef0f3", fg: "#17181c", label: short ? "Awaiting decision" : "Submitted · awaiting decision", glyph: CHECK_PATH }
+    : { bg: "#eef0f3", fg: "#3d4048", label: short ? "Not submitted" : "Not submitted yet", glyph: STATUS_GLYPH.pending };
+}
+
 export function SchoolView({
   school,
   colors,
@@ -123,14 +106,8 @@ export function SchoolView({
   onEdit: () => void;
 }) {
   const now = new Date();
-  const decided = school.status !== "pending";
   const list = facts(school, now);
-  const tone = statusTone(school.status, colors);
-  const pill = decided
-    ? { bg: tone.pillBg, fg: tone.ink, label: STATUS_LABEL[school.status], glyph: STATUS_GLYPH[school.status] }
-    : school.submitted
-      ? { bg: "#eef0f3", fg: "#17181c", label: "Submitted · awaiting decision", glyph: CHECK_PATH }
-      : { bg: "#eef0f3", fg: "#3d4048", label: "Not submitted yet", glyph: STATUS_GLYPH.pending };
+  const pill = statusPill(school, colors);
   const locLine = [school.location, school.classification].filter(Boolean).join(" · ");
 
   return (
