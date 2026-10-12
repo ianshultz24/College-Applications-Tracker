@@ -188,3 +188,12 @@ input[type="date"]::-webkit-date-and-time-value {
     animation: none !important;
   }
 }
+
+/* List view: schools that don't match the highlight chips fade back, and return when hovered or focused. */
+.ct-dim {
+  opacity: 0.32;
+}
+.ct-dim:hover,
+.ct-dim:focus-within {
+  opacity: 1;
+}

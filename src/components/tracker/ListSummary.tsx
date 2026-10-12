@@ -151,7 +151,7 @@ export function ListSummary({
               </div>
             ))}
           </div>
-          <span className="mt-1.5 text-[12px] text-muted">vs. each middle 50%</span>
+          <span className="mt-1.5 text-[12px] text-muted">vs. schools’ middle 50%</span>
         </Box>
       )}
     </div>

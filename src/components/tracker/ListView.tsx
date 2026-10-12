@@ -1,12 +1,29 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ExternalLink, NotebookText, Plus } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
-import { plateInk } from "@/lib/colors";
-import { deadlineInfo, decisionInfo, DEFAULT_SORT, nextSort, SORT_KEYS, sortSchools, type DateInfo, type Sort, type SortKey } from "@/lib/list";
+import { motion } from "motion/react";
+import { useMemo, useState, type ReactNode } from "react";
+import { plateInk, statusTone } from "@/lib/colors";
+import {
+  deadlineInfo,
+  decisionInfo,
+  DEFAULT_SORT,
+  GROUP_BYS,
+  GROUP_LABEL,
+  groupSchools,
+  nextSort,
+  SORT_KEYS,
+  SORTS,
+  sortSchools,
+  STATUS_ORDER,
+  type DateInfo,
+  type GroupBy,
+  type Sort,
+  type SortKey,
+} from "@/lib/list";
 import { monogram } from "@/lib/monogram";
-import { ROUND_NAME, type Colors, type School } from "@/lib/types";
-import { Glyph } from "./glyphs";
+import { ROUND_NAME, STATUS_LABEL, type Colors, type School, type Status } from "@/lib/types";
+import { Glyph, STATUS_GLYPH } from "./glyphs";
 import { ListSummary } from "./ListSummary";
 import { statusPill } from "./SchoolView";
 import { usePref } from "./usePref";
@@ -21,23 +38,42 @@ type Props = {
 };
 
 const SHADOW = "0 40px 100px -30px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.16)";
+const COLUMNS = 10;
+/** Rows glide to their new place when the order changes. */
+const rowMove = { type: "spring", bounce: 0, duration: 0.4 } as const;
 
-/** The list's remembered sort (anything unreadable falls back to your own order). */
-function useSort(): [Sort, (s: Sort) => void] {
+/** A highlight chip: a status, or "not submitted yet". */
+type Chip = Status | "unsubmitted";
+
+function matches(s: School, chips: ReadonlySet<Chip>) {
+  return chips.has(s.status) || (chips.has("unsubmitted") && s.status === "pending" && !s.submitted);
+}
+
+/** The list's remembered sort and grouping (anything unreadable falls back to your order, ungrouped). */
+function useListPrefs() {
   const [raw, setRaw] = usePref("ct-list");
-  const sort = useMemo<Sort>(() => {
+  const prefs = useMemo(() => {
+    let sort = DEFAULT_SORT;
+    let group: GroupBy = "none";
     try {
-      const v = JSON.parse(raw ?? "") as Partial<Sort>;
-      if (SORT_KEYS.includes(v.key as SortKey) && (v.dir === "asc" || v.dir === "desc")) return { key: v.key as SortKey, dir: v.dir };
+      const v = JSON.parse(raw ?? "") as { key?: string; dir?: string; group?: string };
+      if (SORT_KEYS.includes(v.key as SortKey) && (v.dir === "asc" || v.dir === "desc")) sort = { key: v.key as SortKey, dir: v.dir };
+      if (GROUP_BYS.includes(v.group as GroupBy)) group = v.group as GroupBy;
     } catch {}
-    return DEFAULT_SORT;
+    return { sort, group };
   }, [raw]);
-  return [sort, (s) => setRaw(JSON.stringify(s))];
+  const save = (next: { sort: Sort; group: GroupBy }) => setRaw(JSON.stringify({ ...next.sort, group: next.group }));
+  return {
+    ...prefs,
+    setSort: (sort: Sort) => save({ ...prefs, sort }),
+    setGroup: (group: GroupBy) => save({ ...prefs, group }),
+  };
 }
 
 export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Props) {
-  const [sort, setSort] = useSort();
-  const rows = useMemo(() => sortSchools(schools, sort), [schools, sort]);
+  const { sort, group, setSort, setGroup } = useListPrefs();
+  const [chips, setChips] = useState<ReadonlySet<Chip>>(() => new Set());
+  const groups = useMemo(() => groupSchools(sortSchools(schools, sort), group), [schools, sort, group]);
   const now = new Date();
   const satScale = useMemo(() => {
     const lows = schools.flatMap((s) => (s.sat_25 != null ? [s.sat_25] : []));
@@ -45,6 +81,13 @@ export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Pro
     const lo = lows.length ? Math.max(400, Math.min(1200, Math.floor((Math.min(...lows) - 60) / 100) * 100)) : 1000;
     return { lo, hi: 1600 };
   }, [schools, mySat]);
+
+  const toggleChip = (c: Chip) =>
+    setChips((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(c)) next.add(c);
+      return next;
+    });
 
   const header = (key: SortKey, label: string, align: "left" | "right" = "left") => {
     const active = sort.key === key;
@@ -79,30 +122,31 @@ export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Pro
             {schools.length} {schools.length === 1 ? "school" : "schools"}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {sort.key !== "order" && (
-            <button
-              type="button"
-              onClick={() => setSort(DEFAULT_SORT)}
-              className="h-10 rounded-[12px] px-3 text-[13.5px] font-medium text-subtle hover:bg-[#f5f5f7] hover:text-ink"
-            >
-              Back to your order
-            </button>
-          )}
-          <span data-tile="__add">
-            <button
-              type="button"
-              onClick={onAdd}
-              className="flex h-10 items-center gap-1.5 rounded-[12px] bg-ink px-4 text-[14px] font-semibold whitespace-nowrap text-white hover:bg-[#2b2d34]"
-            >
-              <Plus size={16} strokeWidth={2.2} aria-hidden />
-              Add school
-            </button>
-          </span>
-        </div>
+        <span data-tile="__add">
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex h-10 items-center gap-1.5 rounded-[12px] bg-ink px-4 text-[14px] font-semibold whitespace-nowrap text-white hover:bg-[#2b2d34]"
+          >
+            <Plus size={16} strokeWidth={2.2} aria-hidden />
+            Add school
+          </button>
+        </span>
       </div>
 
       <ListSummary schools={schools} colors={colors} mySat={mySat} onOpen={onOpen} />
+
+      <Controls
+        schools={schools}
+        colors={colors}
+        sort={sort}
+        group={group}
+        chips={chips}
+        onSort={setSort}
+        onGroup={setGroup}
+        onChip={toggleChip}
+        onClearChips={() => setChips(new Set())}
+      />
 
       <div className="overflow-x-auto pb-3">
         <table className="w-full min-w-[980px] border-collapse text-left">
@@ -122,14 +166,165 @@ export function ListView({ schools, colors, mySat, logoUrl, onOpen, onAdd }: Pro
               </th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map((s) => (
-              <Row key={s.id} school={s} colors={colors} logoUrl={logoUrl(s)} mySat={mySat} satScale={satScale} now={now} onOpen={onOpen} />
-            ))}
-          </tbody>
+          {groups.map((g) => (
+            <tbody key={`${group}-${g.key}`}>
+              {group !== "none" && (
+                <tr>
+                  <th colSpan={COLUMNS} scope="rowgroup" className="border-t border-[#efeff2] px-6 pt-5 pb-2 text-left font-normal">
+                    <span className="flex items-center gap-2">
+                      {g.status && (
+                        <span style={{ color: statusTone(g.status, colors).ink }}>
+                          <Glyph d={STATUS_GLYPH[g.status]} size={14} />
+                        </span>
+                      )}
+                      <span className="text-[15px] font-semibold">{g.label}</span>
+                      {g.sub && <span className="text-[13px] text-muted">{g.sub}</span>}
+                      <span className="text-[13px] text-muted tabular-nums">· {g.schools.length}</span>
+                    </span>
+                  </th>
+                </tr>
+              )}
+              {g.schools.map((s) => (
+                <Row
+                  key={s.id}
+                  school={s}
+                  colors={colors}
+                  logoUrl={logoUrl(s)}
+                  mySat={mySat}
+                  satScale={satScale}
+                  now={now}
+                  dim={chips.size > 0 && !matches(s, chips)}
+                  onOpen={onOpen}
+                />
+              ))}
+            </tbody>
+          ))}
         </table>
       </div>
     </section>
+  );
+}
+
+const segBtn = "h-full rounded-[9px] px-3 text-[13px] font-medium whitespace-nowrap transition-colors";
+
+/** Highlight chips on the left; grouping and the sort menu on the right. */
+function Controls({
+  schools,
+  colors,
+  sort,
+  group,
+  chips,
+  onSort,
+  onGroup,
+  onChip,
+  onClearChips,
+}: {
+  schools: School[];
+  colors: Colors;
+  sort: Sort;
+  group: GroupBy;
+  chips: ReadonlySet<Chip>;
+  onSort: (s: Sort) => void;
+  onGroup: (g: GroupBy) => void;
+  onChip: (c: Chip) => void;
+  onClearChips: () => void;
+}) {
+  const count = (c: Chip) => schools.filter((s) => matches(s, new Set([c]))).length;
+  const options: Chip[] = [...STATUS_ORDER.filter((st) => count(st) > 0), ...(count("unsubmitted") > 0 ? (["unsubmitted"] as const) : [])];
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 pb-4">
+      <div role="group" aria-label="Highlight schools" className="flex flex-wrap items-center gap-1.5">
+        {options.map((c) => {
+          const on = chips.has(c);
+          const tone = c === "unsubmitted" ? null : statusTone(c, colors);
+          return (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChip(c)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] whitespace-nowrap transition-colors hover:bg-[#f5f5f7]"
+              style={{
+                background: on ? (tone?.pillBg ?? "#eef0f3") : undefined,
+                borderColor: on ? (tone?.border ?? "#17181c") : "#e3e4e9",
+                color: on ? (tone?.ink ?? "#17181c") : "#3d4048",
+                fontWeight: on ? 600 : 500,
+              }}
+            >
+              <span style={{ color: tone?.ink ?? "#3d4048" }}>
+                <Glyph d={c === "unsubmitted" ? STATUS_GLYPH.pending : STATUS_GLYPH[c]} size={12} />
+              </span>
+              {c === "unsubmitted" ? "Not submitted" : STATUS_LABEL[c]}
+              <span className="tabular-nums opacity-70">{count(c)}</span>
+            </button>
+          );
+        })}
+        {chips.size > 0 && (
+          <button type="button" onClick={onClearChips} className="h-8 rounded-full px-2.5 text-[13px] font-medium text-subtle hover:bg-[#f5f5f7] hover:text-ink">
+            Clear
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span id="ct-group-label" className="text-[12.5px] text-muted">
+            Group
+          </span>
+          <div role="group" aria-labelledby="ct-group-label" className="flex h-8 items-center rounded-[11px] bg-[#f1f1f3] p-[3px]">
+            {GROUP_BYS.map((g) => (
+              <button
+                key={g}
+                type="button"
+                aria-pressed={group === g}
+                onClick={() => onGroup(g)}
+                className={segBtn}
+                style={{
+                  background: group === g ? "#ffffff" : "transparent",
+                  color: group === g ? "#17181c" : "#53565e",
+                  boxShadow: group === g ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                }}
+              >
+                {GROUP_LABEL[g]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="ct-sort" className="text-[12.5px] text-muted">
+            Sort
+          </label>
+          <div className="flex h-8 items-center rounded-[11px] border border-[#e3e4e9] bg-white">
+            <select
+              id="ct-sort"
+              value={sort.key}
+              onChange={(e) => {
+                const key = e.target.value as SortKey;
+                onSort({ key, dir: SORTS[key].first });
+              }}
+              className="h-full cursor-pointer appearance-none rounded-l-[11px] bg-transparent pr-2 pl-3 text-[13px] font-medium text-ink"
+            >
+              {SORT_KEYS.map((k) => (
+                <option key={k} value={k}>
+                  {SORTS[k].label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => onSort({ ...sort, dir: sort.dir === "asc" ? "desc" : "asc" })}
+              aria-label={sort.dir === "asc" ? "Ascending. Switch to descending" : "Descending. Switch to ascending"}
+              title="Flip the order"
+              className="flex h-full w-8 items-center justify-center rounded-r-[11px] border-l border-[#e3e4e9] text-ink hover:bg-[#f5f5f7]"
+            >
+              {sort.dir === "asc" ? <ArrowUp size={14} strokeWidth={2.2} aria-hidden /> : <ArrowDown size={14} strokeWidth={2.2} aria-hidden />}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -160,6 +355,7 @@ function Row({
   mySat,
   satScale,
   now,
+  dim,
   onOpen,
 }: {
   school: School;
@@ -168,6 +364,8 @@ function Row({
   mySat: number | null;
   satScale: { lo: number; hi: number };
   now: Date;
+  /** Doesn't match the highlight chips: see-through until hovered or focused. */
+  dim: boolean;
   onOpen: (id: string) => void;
 }) {
   const pill = statusPill(s, colors, true);
@@ -176,7 +374,13 @@ function Row({
   const done = s.supplements_total ? Math.min(s.supplements_done ?? 0, s.supplements_total) : 0;
 
   return (
-    <tr data-tile={s.id} onClick={() => onOpen(s.id)} className="group cursor-pointer border-t border-[#efeff2] transition-colors hover:bg-[#f7f7f9]">
+    <motion.tr
+      layout="position"
+      transition={rowMove}
+      data-tile={s.id}
+      onClick={() => onOpen(s.id)}
+      className={`cursor-pointer border-t border-[#efeff2] transition-[background-color,opacity] duration-200 hover:bg-[#f7f7f9] ${dim ? "ct-dim" : ""}`}
+    >
       <Cell>
         <div className="flex min-w-[184px] items-center gap-3">
           <div className="flex size-10 flex-none items-center justify-center rounded-[12px] border border-[#ebebef] bg-white">
@@ -268,7 +472,7 @@ function Row({
           </a>
         )}
       </Cell>
-    </tr>
+    </motion.tr>
   );
 }
 
