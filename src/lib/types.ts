@@ -83,5 +83,7 @@ export type Settings = {
   shimmer: boolean;
   /** Status frames and glimmer: Accepted's gold frame and foil, Waitlisted's dashed ring, Deferred's airmail stripes, Rejected's grain. */
   finishes: boolean;
+  /** Tint strength: how much status color a decided tile's body holds (0.2–0.6; the rest is white). */
+  tint: number;
   my_sat: number | null;
 };

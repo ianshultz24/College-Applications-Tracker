@@ -246,6 +246,7 @@ function TrackerView() {
                 showNames={settings.show_names}
                 shimmer={settings.shimmer}
                 finishes={settings.finishes}
+                tint={settings.tint}
                 reduced={reduced}
                 editAll={editAll}
                 hidden={hidden}
@@ -277,6 +278,7 @@ function TrackerView() {
           school={partySchool}
           colors={settings.colors}
           finishes={settings.finishes}
+          tint={settings.tint}
           L={L}
           logoUrl={store.logoUrl(partySchool)}
           overCard={!!open}

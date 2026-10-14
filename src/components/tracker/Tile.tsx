@@ -32,6 +32,8 @@ type Props = {
   shimmer: boolean;
   /** Show the status frames and glimmer (the setting). */
   finishes: boolean;
+  /** Tint strength (the setting). */
+  tint: number;
   reduced: boolean;
   editAll: boolean;
   /** The card for this tile is open: keep the slot, hide the tile. */
@@ -54,6 +56,7 @@ export function Tile({
   showNames,
   shimmer,
   finishes,
+  tint,
   reduced,
   editAll,
   isOpen,
@@ -67,7 +70,7 @@ export function Tile({
   const [hover, setHover] = useState(false);
   const [dotLabel, setDotLabel] = useState<string | null>(null);
 
-  const look = tileLook(school.status, colors, finishes);
+  const look = tileLook(school.status, colors, finishes, tint);
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const kick = useStatusKick(school.id);
@@ -184,7 +187,7 @@ export function Tile({
             className="ct-tile"
             style={surface}
           >
-            <TileFace school={school} colors={colors} L={L} logoUrl={logoUrl} editAll={editAll} finishes={finishes} animate={finishes && !reduced} />
+            <TileFace school={school} colors={colors} L={L} logoUrl={logoUrl} editAll={editAll} finishes={finishes} tint={tint} animate={finishes && !reduced} />
           </button>
         </div>
 
@@ -332,14 +335,16 @@ type FaceProps = {
   editAll: boolean;
   /** Show the status frames and glimmer. */
   finishes?: boolean;
+  /** Tint strength. */
+  tint?: number;
   /** Play the status's slow resting effect (foil glint, marching ring). */
   animate?: boolean;
 };
 
 /** What's printed on a tile: logo or monogram, sheen, rim, status pill, submitted check. */
-function TileFace({ school, colors, L, logoUrl, editAll, finishes = true, animate = false }: FaceProps) {
+function TileFace({ school, colors, L, logoUrl, editAll, finishes = true, tint, animate = false }: FaceProps) {
   const [imgFailed, setImgFailed] = useState<string | null>(null);
-  const look = tileLook(school.status, colors, finishes);
+  const look = tileLook(school.status, colors, finishes, tint);
   const decided = school.status !== "pending";
   const logo = logoUrl && imgFailed !== logoUrl ? logoUrl : null;
   const mono = monogram(school.name, school.short_name);
@@ -546,7 +551,7 @@ function Finish({ look, L, animate, seed }: { look: TileLook; L: Layout; animate
 
 /** A still copy of a tile (no hover, no buttons). The card starts and ends its animation looking exactly like this. */
 export function TileSkin(props: FaceProps) {
-  const look = tileLook(props.school.status, props.colors, props.finishes);
+  const look = tileLook(props.school.status, props.colors, props.finishes, props.tint);
   return (
     <div
       style={{

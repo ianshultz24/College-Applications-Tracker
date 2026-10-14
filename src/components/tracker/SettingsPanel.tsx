@@ -202,6 +202,21 @@ export function SettingsPanel({ open, narrow, onClose }: { open: boolean; narrow
               </div>
             );
           })}
+          <label className="flex flex-col gap-1.5 px-3.5 pt-1.5 pb-2.5">
+            <span className="flex justify-between text-[14px]">
+              <span>Tint strength</span>
+              <span className="text-[13px] text-white/72">{Math.round(settings.tint * 100)}%</span>
+            </span>
+            <input
+              type="range"
+              min={20}
+              max={60}
+              step={1}
+              value={Math.round(settings.tint * 100)}
+              onChange={(e) => store.updateSettings({ tint: Number(e.target.value) / 100 })}
+              className="m-0 w-full accent-white"
+            />
+          </label>
         </div>
       </Section>
 

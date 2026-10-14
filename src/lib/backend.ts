@@ -20,7 +20,7 @@ export interface Backend {
 export const SCHOOL_COLUMNS =
   "id,user_id,name,short_name,location,round,classification,deadline,decision_start,decision_end,submitted,status,acceptance_rate,sat_25,sat_75,supplements_done,supplements_total,portal_url,notes,custom_fields,logo_path,position,updated_at";
 
-export const SETTINGS_COLUMNS = "colors,background_path,blur_px,dim,tile_size,show_names,shimmer,finishes,my_sat";
+export const SETTINGS_COLUMNS = "colors,background_path,blur_px,dim,tile_size,show_names,shimmer,finishes,tint,my_sat";
 
 type SettingsRow = Partial<Omit<Settings, "colors">> & { colors?: Record<string, unknown> | null };
 
@@ -41,6 +41,7 @@ export function settingsFromRow(row: SettingsRow | null | undefined): Settings {
     show_names: row.show_names ?? DEFAULT_SETTINGS.show_names,
     shimmer: row.shimmer ?? DEFAULT_SETTINGS.shimmer,
     finishes: row.finishes ?? DEFAULT_SETTINGS.finishes,
+    tint: row.tint == null ? DEFAULT_SETTINGS.tint : Number(row.tint),
     my_sat: row.my_sat ?? null,
   };
 }

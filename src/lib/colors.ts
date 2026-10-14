@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   show_names: false,
   shimmer: true,
   finishes: true,
+  tint: 0.4,
   my_sat: null,
 };
 
@@ -79,11 +80,20 @@ export function inkFor(color: string, bg: string): string {
   return ink;
 }
 
-/** Tints of a status color, with an ink that keeps 4.6:1 contrast on the tile. */
-export function tones(color: string) {
+/** The tint strength the design's tile mixes were drawn at: 30% status color in the tile body. */
+const DESIGN_TINT = 0.3;
+
+/** A white share from the design, scaled for tint strength (stronger tint, less white). */
+function whiteShare(w: number, tint: number): number {
+  return Math.min(0.95, Math.max(0, 1 - (1 - w) * (tint / DESIGN_TINT)));
+}
+
+/** Tints of a status color, with an ink that keeps 4.6:1 contrast on the tile. Pills stay at the design's tint. */
+export function tones(color: string, tint = DESIGN_TINT) {
   const m = (t: number) => mixHex(color, "#ffffff", t);
-  const c = m(0.7);
-  return { C: color, a: m(0.86), b: m(0.5), c, ink: inkFor(color, c), pillBg: m(0.82), border: m(0.35) };
+  const s = (t: number) => m(whiteShare(t, tint));
+  const c = s(0.7);
+  return { C: color, a: s(0.86), b: s(0.5), c, ink: inkFor(color, c), pillBg: m(0.82), border: m(0.35) };
 }
 
 /** The warm gold used for Accepted's foil and the celebration. */
@@ -127,13 +137,15 @@ const extras = { grain: false, ambient: null, ringColor: null, stripes: null } a
  * The tile surface for a status: glass, plus a finish of its own so status never rests on color alone.
  * `finishes` off drops the extra frames and glimmer (Withdrawn stays faded and Rejected stays matte).
  */
-export function tileLook(status: Status, colors: Colors, finishes = true): TileLook {
+export function tileLook(status: Status, colors: Colors, finishes = true, tint: number = DEFAULT_SETTINGS.tint): TileLook {
   const base = colors.base;
   if (status === "withdrawn") {
     // A pale, shaded ghost that lets the background show through: it doesn't matter anymore.
     const W = colors.withdrawn;
-    const top = mixHex(W, "#ffffff", 0.74);
-    const bot = mixHex(W, "#ffffff", 0.5);
+    // It deepens half as much as the others, so it still reads as faded.
+    const ghost = (share: number) => whiteShare(share, DESIGN_TINT + (tint - DESIGN_TINT) / 2);
+    const top = mixHex(W, "#ffffff", ghost(0.74));
+    const bot = mixHex(W, "#ffffff", ghost(0.5));
     return {
       ...extras,
       surface: `${highlight(0.2)}, linear-gradient(160deg, ${top}, ${bot})`,
@@ -172,11 +184,12 @@ export function tileLook(status: Status, colors: Colors, finishes = true): TileL
       edge: mixHex(mixHex(base, "#d9dde5", 0.4), "#000000", 0.26),
     };
   }
-  const T = tones(colors[status]);
+  const T = tones(colors[status], tint);
   if (status === "rejected") {
     // Matte: a flat, papery finish that sits low, with no gloss.
-    const top = mixHex(T.C, "#ffffff", 0.8);
-    const bot = mixHex(T.C, "#ffffff", 0.68);
+    const top = mixHex(T.C, "#ffffff", whiteShare(0.8, tint));
+    const bot = mixHex(T.C, "#ffffff", whiteShare(0.68, tint));
+    const ink = inkFor(T.C, bot);
     return {
       ...extras,
       grain: finishes,
@@ -187,8 +200,8 @@ export function tileLook(status: Status, colors: Colors, finishes = true): TileL
       blend: "multiply",
       logoFilter: "saturate(0.55)",
       logoOpacity: 0.88,
-      mono: inkFor(T.C, bot),
-      ink: inkFor(T.C, bot),
+      mono: ink,
+      ink,
       labelBg: "rgba(255,255,255,0.5)",
       labelRing: "inset 0 0 0 1px rgba(255,255,255,0.55)",
       opacity: 1,

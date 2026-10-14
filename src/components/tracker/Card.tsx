@@ -364,6 +364,7 @@ function CardShell({
               school={skinSchool}
               colors={store.settings.colors}
               finishes={store.settings.finishes}
+              tint={store.settings.tint}
               L={L}
               logoUrl={store.logoUrl(skinSchool)}
               editAll={false}
